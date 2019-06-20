@@ -23,6 +23,7 @@ package io.github.agentsoz.ees;
  */
 
 
+import io.github.agentsoz.bdiabm.data.ActionPerceptContainer;
 import io.github.agentsoz.dataInterface.DataClient;
 import io.github.agentsoz.dataInterface.DataServer;
 import io.github.agentsoz.dataInterface.DataSource;
@@ -36,7 +37,7 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 
 
-public class DiffusionModel implements DataSource<SortedMap<Double, DiffusedContent>>, DataClient<String[]> {
+public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent>>, DataClient<String[]> {
 
     private final Logger logger = LoggerFactory.getLogger(DiffusionModel.class);
 
@@ -45,7 +46,6 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusedCont
     private DataServer dataServer;
     private double startTimeInSeconds = -1;
     private SocialNetworkManager snManager;
-    private TreeMap<Double, DiffusedContent> allStepsInfoSpreadMap;
     private double lastUpdateTimeInMinutes = -1;
     private Time.TimestepUnit timestepUnit = Time.TimestepUnit.SECONDS;
     private String configFile = null;
@@ -56,7 +56,6 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusedCont
 
     public DiffusionModel(String configFile) {
         this.snManager = (configFile==null) ? null : new SocialNetworkManager(configFile);
-        this.allStepsInfoSpreadMap = new TreeMap<>();
         this.localContentFromAgents = new HashMap<>();
         this.globalContentFromAgents =  new ArrayList<String>();
     }
@@ -64,7 +63,6 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusedCont
     public DiffusionModel(Map<String, String> opts, DataServer dataServer, List<String> agentsIds) {
         parse(opts);
         this.snManager = (configFile==null) ? null : new SocialNetworkManager(configFile);
-        this.allStepsInfoSpreadMap = new TreeMap<>();
         this.localContentFromAgents = new HashMap<>();
         this.globalContentFromAgents =  new ArrayList<String>();
         this.dataServer = dataServer;
@@ -110,17 +108,26 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusedCont
         this.dataServer.subscribe(this, Constants.SOCIAL_NETWORK_BROADCAST_MSG);
     }
 
-    private void stepDiffusionProcess() {
+    private void stepDiffusionProcess(HashMap<String,DiffusedContent> allAgentContentsMap) {
         snManager.diffuseContent(); // step the diffusion model
         if (snManager.getDiffModel() instanceof ICModel) {
             ICModel icModel = (ICModel) snManager.getDiffModel();
             icModel.recordCurrentStepSpread(dataServer.getTime());
 
-            HashMap<String, String[]> latestUpdate = icModel.getLatestDiffusionUpdates();
+            HashMap<String, ArrayList<String>> latestUpdate = icModel.getLatestDiffusionUpdates(); 
             if (!latestUpdate.isEmpty()) {
-                DiffusedContent dc = new DiffusedContent();
-                dc.setContentSpreadMap(latestUpdate);
-                this.allStepsInfoSpreadMap.put(dataServer.getTime(), dc);
+
+                for(Map.Entry<String,ArrayList<String>> contents: latestUpdate.entrySet()) {
+                    String contentType = contents.getKey();
+                    ArrayList<String> agentIDs = contents.getValue();
+
+                    for(String id: agentIDs) { // for each agent create a DiffusedContent and put content type and parameters
+                        DiffusedContent content = getOrCreateDiffusedContent(id,allAgentContentsMap);
+                        String[] params = {Constants.ACTIVE};
+                        content.getContentsMap().put(contentType,params );
+                    }
+                }
+
                 logger.debug("put timed diffusion updates for ICModel at {}", dataServer.getTime());
             }
         }
@@ -128,9 +135,22 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusedCont
 
     }
 
+    public DiffusedContent getOrCreateDiffusedContent(String agentId, HashMap<String,DiffusedContent> diffusedContentsMap) {
+        DiffusedContent content = diffusedContentsMap.get(agentId);
+        if (content == null) {
+            content = new DiffusedContent();
+            diffusedContentsMap.put(agentId, content);
+        }
+
+        return content;
+    }
     @Override
-    public SortedMap<Double, DiffusedContent> sendData(double timestep, String dataType) {
+    public HashMap<String,DiffusedContent> sendData(double timestep, String dataType) {
         Double nextTime = timestep + SNConfig.getDiffturn();
+
+        //create the data structure that is passed to the BDI side
+        HashMap<String, DiffusedContent> currentStepDiffusedContents = new HashMap<>();
+
         if (nextTime != null) {
             dataServer.registerTimedUpdate(Constants.DIFFUSION, this, nextTime);
             // update the model with any new messages form agents
@@ -156,18 +176,20 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusedCont
                 icModel.updateSocialStatesFromGlobalContent(globalContentFromAgents);
 
             }
+
             // step the model before begin called again
-            stepDiffusionProcess();
+            stepDiffusionProcess(currentStepDiffusedContents);
 
             // clear the contents
             globalContentFromAgents.clear();
             localContentFromAgents.clear();
-        }
-        double currentTime = Time.convertTime(timestep, timestepUnit, Time.TimestepUnit.MINUTES);
-        SortedMap<Double, DiffusedContent> periodicInfoSpread = allStepsInfoSpreadMap.subMap(lastUpdateTimeInMinutes, currentTime);
-        lastUpdateTimeInMinutes = currentTime;
 
-        return (periodicInfoSpread.isEmpty()) ? null : periodicInfoSpread;
+        }
+
+        double currentTime = Time.convertTime(timestep, timestepUnit, Time.TimestepUnit.MINUTES);
+        lastUpdateTimeInMinutes = currentTime;
+        return (currentStepDiffusedContents.isEmpty()) ? null : currentStepDiffusedContents;
+
     }
 
 

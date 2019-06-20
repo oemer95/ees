@@ -24,6 +24,7 @@ package io.github.agentsoz.ees;
 
 import io.github.agentsoz.abmjill.JillModel;
 import io.github.agentsoz.bdiabm.QueryPerceptInterface;
+import io.github.agentsoz.bdiabm.data.PerceptContent;
 import io.github.agentsoz.bdiabm.v2.AgentDataContainer;
 import io.github.agentsoz.dataInterface.DataClient;
 import io.github.agentsoz.dataInterface.DataServer;
@@ -79,7 +80,7 @@ public class JillBDIModel extends JillModel implements DataClient {
 	// Map<Time,Agent> of scheduled fire alertPercepts
 	private PriorityQueue<TimedAlert> alertPercepts;
 
-	Map<Double, DiffusedContent> msgMap;
+	Map<String, DiffusedContent> contentsMap;
 	HashMap<String,Set<String>> informedAgents;
 
 	private int evacPeak = 0;
@@ -91,7 +92,7 @@ public class JillBDIModel extends JillModel implements DataClient {
 
 	public JillBDIModel(String[] initArgs) {
 		super();
-		msgMap = new TreeMap<>();
+		contentsMap = new HashMap<>();
 		informedAgents = new HashMap<>();
 		mapMATsimToJillIds = new LinkedHashMap<String,String>();
 		mapJillToMATsimIds = new LinkedHashMap<String,String>();
@@ -387,27 +388,19 @@ public class JillBDIModel extends JillModel implements DataClient {
 	}
 
 	private void sendSocialNetworkMessagesToAgents(AgentDataContainer adc) {
-//		for (Double msgTime : msgMap.keySet()) {
-//			DiffusedContent content = msgMap.get(msgTime);
-//			Map<String, String[]> msgs = content.getcontentSpreadMap();
-//			for (String msg : msgs.keySet()) {
-//				Set<String> messagedAgents = informedAgents.containsKey(msg) ? informedAgents.get(msg) : new HashSet<>();
-//				String[] agents = msgs.get(msg);
-//				for (String agent : agents) {
-//					if (!messagedAgents.contains(agent)) {
-//						String id = String.valueOf(agent);
-//						adc.getOrCreate(id).getPerceptContainer().put(PerceptList.SOCIAL_NETWORK_MSG, msg);
-//						messagedAgents.add(agent);
-//						informedAgents.put(msg,messagedAgents);
-//					}
-//				}
-//				logger.info("Total "+messagedAgents.size()+" agents received this message from social network:" + msg);
-//				logger.info("Agents receiving message from social network are: {}",
-//						Arrays.toString(messagedAgents.toArray()));
-//
-//			}
-//		}
-//		msgMap.clear();
+
+		for (String id : contentsMap.keySet()) {
+			DiffusedContent diffusedContent  = contentsMap.get(id);
+			PerceptContent snPercept = new PerceptContent(Constants.SOCIAL_NETWORK_MSG,diffusedContent);
+//			adc.getOrCreate(id).getPerceptContainer().put(Constants.SOCIAL_NETWORK_MSG, content);
+			adc.putPercept(id,Constants.SOCIAL_NETWORK_MSG,snPercept);
+
+			}
+		logger.info("Total "+contentsMap.size()+" agents received  influences from social network:");
+		logger.info("Agents receiving influences from social network are: {}",
+				Arrays.toString(contentsMap.keySet().toArray()));
+		contentsMap.clear(); // clear last diffusion step contents
+
 	}
 
 	private void translateToJillIds(AgentDataContainer adc) {
@@ -463,6 +456,9 @@ public class JillBDIModel extends JillModel implements DataClient {
 			//takeControl(data);
 			synchronized (getSequenceLock()) {
 				getAgentDataContainer().clear();
+				if(!contentsMap.isEmpty()){
+					sendSocialNetworkMessagesToAgents(data);
+				}
 				takeControl(time, data);
 				dataServer.publish(Constants.AGENT_DATA_CONTAINER_FROM_BDI, getAgentDataContainer());
 			}
@@ -472,8 +468,8 @@ public class JillBDIModel extends JillModel implements DataClient {
 			fireAlertTime = time;
 		});
 
-		listeners.put(Constants.DIFFUSION, (DataClient<Map<Double, DiffusedContent>>) (time, dataType, data) -> {
-			msgMap = data;
+		listeners.put(Constants.DIFFUSION, (DataClient<Map<String, DiffusedContent>>) (time, dataType, data) -> {
+			contentsMap = data;
 		});
 
 		listeners.put(Constants.SOCIAL_NETWORK_MSG, (DataClient<String[]>) (time, dataType, data) -> {

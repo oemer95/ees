@@ -58,6 +58,8 @@ public class Constants {
     public static final String BDI_STATE_UPDATES    = "bdi_state_updates";
     public static final String SOCIAL_NETWORK_MSG = "social_network_message";
     public static final String SOCIAL_NETWORK_BROADCAST_MSG = "social_network_broadcast_message";
+    public static final String ACTIVE = "active";
+
 
     // Used to control the simulation run and data passing between BDI and ABM models
     public static final String TAKE_CONTROL_BDI = io.github.agentsoz.util.PerceptList.TAKE_CONTROL_BDI;

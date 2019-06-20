@@ -30,6 +30,7 @@ import io.github.agentsoz.bdiabm.QueryPerceptInterface;
 import io.github.agentsoz.bdiabm.data.ActionContent;
 import io.github.agentsoz.dataInterface.DataServer;
 import io.github.agentsoz.ees.Constants;
+import io.github.agentsoz.ees.DiffusedContent;
 import io.github.agentsoz.ees.EmergencyMessage;
 import io.github.agentsoz.ees.Run;
 import io.github.agentsoz.jill.core.beliefbase.BeliefBaseException;
@@ -231,7 +232,9 @@ public abstract class BushfireAgent extends  Agent implements io.github.agentsoz
         if (perceptID.equals(Constants.EMERGENCY_MESSAGE)) {
             updateResponseBarometerMessages(parameters);
         } else if (perceptID.equals(Constants.SOCIAL_NETWORK_MSG)) {
-            updateResponseBarometerSocialMessage(parameters);
+            DiffusedContent diffusedContent = (DiffusedContent) parameters;
+            //process diffusedContent
+           // updateResponseBarometerSocialMessage(parameters);
         } else if (perceptID.equals(Constants.FIELD_OF_VIEW)) {
             updateResponseBarometerFieldOfViewPercept(parameters);
             if (Constants.SIGHTED_FIRE.equalsIgnoreCase(parameters.toString())) {
