@@ -328,7 +328,7 @@ public class JillBDIModel extends JillModel implements DataClient {
 		dataServer.subscribe(this, Constants.TAKE_CONTROL_BDI);
 		dataServer.subscribe(this, Constants.FIRE_ALERT);
 		dataServer.subscribe(this, Constants.DIFFUSION);
-		dataServer.subscribe(this, Constants.SOCIAL_NETWORK_MSG);
+		dataServer.subscribe(this, Constants.SOCIAL_NETWORK_CONTENT);
 
 		logger.info("Initialising jill with args: " + Arrays.toString(initArgs));
 		// Initialise the Jill model
@@ -373,7 +373,7 @@ public class JillBDIModel extends JillModel implements DataClient {
 			case Constants.TAKE_CONTROL_BDI:
 			case Constants.FIRE_ALERT:
 			case Constants.DIFFUSION:
-			case Constants.SOCIAL_NETWORK_MSG:
+			case Constants.SOCIAL_NETWORK_CONTENT:
 				dataListeners.get(dataType).receiveData(time, dataType, data);
 				break;
 			default:
@@ -390,9 +390,9 @@ public class JillBDIModel extends JillModel implements DataClient {
 
 		for (String id : contentsMap.keySet()) {
 			DiffusedContent diffusedContent  = contentsMap.get(id);
-			PerceptContent snPercept = new PerceptContent(Constants.SOCIAL_NETWORK_MSG,diffusedContent);
-//			adc.getOrCreate(id).getPerceptContainer().put(Constants.SOCIAL_NETWORK_MSG, content);
-			adc.putPercept(id,Constants.SOCIAL_NETWORK_MSG,snPercept);
+			PerceptContent snPercept = new PerceptContent(Constants.SOCIAL_NETWORK_CONTENT,diffusedContent);
+//			adc.getOrCreate(id).getPerceptContainer().put(Constants.SOCIAL_NETWORK_CONTENT, content);
+			adc.putPercept(id,Constants.SOCIAL_NETWORK_CONTENT,snPercept);
 
 			}
 		logger.info("Total "+contentsMap.size()+" agents received  influences from social network:");
@@ -471,7 +471,7 @@ public class JillBDIModel extends JillModel implements DataClient {
 			contentsMap = data;
 		});
 
-		listeners.put(Constants.SOCIAL_NETWORK_MSG, (DataClient<String[]>) (time, dataType, data) -> {
+		listeners.put(Constants.SOCIAL_NETWORK_CONTENT, (DataClient<String[]>) (time, dataType, data) -> {
 			logger.warn("Ignoring received data of type {}", dataType);
 		});
 

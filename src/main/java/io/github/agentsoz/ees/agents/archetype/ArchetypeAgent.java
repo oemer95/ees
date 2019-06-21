@@ -722,7 +722,7 @@ public class ArchetypeAgent extends Agent implements io.github.agentsoz.bdiabm.A
             case Constants.EMERGENCY_MESSAGE:
                 handleEmergencyMessage(parameters);
                 break;
-            case Constants.SOCIAL_NETWORK_MSG:
+            case Constants.SOCIAL_NETWORK_CONTENT:
                 handleSocialNetworkMessage(parameters);
                 break;
             default:

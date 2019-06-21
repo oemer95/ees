@@ -55,9 +55,9 @@ public class Constants {
 
     //Diffusion model percepts
     public static final String DIFFUSION = "diffusion";
-    public static final String BDI_STATE_UPDATES    = "bdi_state_updates";
-    public static final String SOCIAL_NETWORK_MSG = "social_network_message";
-    public static final String SOCIAL_NETWORK_BROADCAST_MSG = "social_network_broadcast_message";
+    public static final String BDI_REASONING_UPDATES = "bdi_reasoning_updates";
+    public static final String EVACUATION_INFLUENCE = "evacuation_influence";
+    public static final String SOCIAL_NETWORK_CONTENT = "social_network_content";
     public static final String ACTIVE = "active";
 
 

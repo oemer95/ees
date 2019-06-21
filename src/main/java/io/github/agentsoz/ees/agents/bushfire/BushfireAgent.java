@@ -29,10 +29,7 @@ import io.github.agentsoz.bdiabm.EnvironmentActionInterface;
 import io.github.agentsoz.bdiabm.QueryPerceptInterface;
 import io.github.agentsoz.bdiabm.data.ActionContent;
 import io.github.agentsoz.dataInterface.DataServer;
-import io.github.agentsoz.ees.Constants;
-import io.github.agentsoz.ees.DiffusedContent;
-import io.github.agentsoz.ees.EmergencyMessage;
-import io.github.agentsoz.ees.Run;
+import io.github.agentsoz.ees.*;
 import io.github.agentsoz.jill.core.beliefbase.BeliefBaseException;
 import io.github.agentsoz.jill.core.beliefbase.BeliefSetField;
 import io.github.agentsoz.jill.lang.Agent;
@@ -238,9 +235,10 @@ public abstract class BushfireAgent extends  Agent implements io.github.agentsoz
 
         if (perceptID.equals(Constants.EMERGENCY_MESSAGE)) {
             updateResponseBarometerMessages(parameters);
-        } else if (perceptID.equals(Constants.SOCIAL_NETWORK_MSG)) {
+        } else if (perceptID.equals(Constants.SOCIAL_NETWORK_CONTENT)) {
             DiffusedContent diffusedContent = (DiffusedContent) parameters;
             //process diffusedContent
+
            // updateResponseBarometerSocialMessage(parameters);
         } else if (perceptID.equals(Constants.FIELD_OF_VIEW)) {
             updateResponseBarometerFieldOfViewPercept(parameters);
@@ -487,10 +485,13 @@ public abstract class BushfireAgent extends  Agent implements io.github.agentsoz
     }
 
     private void shareWithSocialNetwork(String content) {
-        String[] msg = {content, String.valueOf(getId())};
-        memorise(MemoryEventType.ACTIONED.name(), Constants.SOCIAL_NETWORK_MSG
-                + ":" + content);
-        DataServer.getInstance(Run.DATASERVER).publish(Constants.SOCIAL_NETWORK_MSG, msg);
+        SNUpdates snUpdates = new SNUpdates(this.getId());
+
+        String[] msg = {content};
+        snUpdates.getContentsMap().put(Constants.EVACUATION_INFLUENCE,msg);
+        memorise(MemoryEventType.ACTIONED.name(), Constants.BDI_REASONING_UPDATES
+                + ":" + Constants.EVACUATION_INFLUENCE + ":" + content);
+        DataServer.getInstance(Run.DATASERVER).publish(Constants.BDI_REASONING_UPDATES, snUpdates);
     }
 
     /**
