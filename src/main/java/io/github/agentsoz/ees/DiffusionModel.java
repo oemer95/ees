@@ -114,7 +114,7 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
             ICModel icModel = (ICModel) snManager.getDiffModel();
             icModel.recordCurrentStepSpread(dataServer.getTime());
 
-            HashMap<String, ArrayList<String>> latestUpdate = icModel.getLatestDiffusionUpdates(); 
+            HashMap<String, ArrayList<String>> latestUpdate = icModel.getLatestDiffusionUpdates();
             if (!latestUpdate.isEmpty()) {
 
                 for(Map.Entry<String,ArrayList<String>> contents: latestUpdate.entrySet()) {
@@ -259,6 +259,7 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
 
     /**
      * Start publishing data
+     * @param hhmm an array of size 2 with hour and minutes representing start time
      */
     public void start(int[] hhmm) {
         double startTimeInSeconds = Time.convertTime(hhmm[0], Time.TimestepUnit.HOURS, Time.TimestepUnit.SECONDS)

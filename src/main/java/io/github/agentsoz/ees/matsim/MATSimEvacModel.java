@@ -98,9 +98,9 @@ public final class MATSimEvacModel implements ABMServerInterface, QueryPerceptIn
     private static final String eFireAvoidanceBufferForEmergencyVehicles = "fireAvoidanceBufferForEmergencyVehicles";
     private static final String eRoutingAlgorithmType = "routingAlgorithmType";
 
-    ;
-
     public enum EvacuationRoutingAlgorithmType {MATSimDefault, ExampleRoutingAlgorithm}
+
+    MonitorPersonsInDangerZone monitorPersonsEnteringDangerZones;
 
     // Defaults
 
@@ -117,6 +117,8 @@ public final class MATSimEvacModel implements ABMServerInterface, QueryPerceptIn
         this.fireWriter = new Shape2XyWriter( matsimModel.getConfig(), "fire" ) ;
         this.emberWriter = new Shape2XyWriter( matsimModel.getConfig(), "ember" ) ;
         this.disruptionWriter = new DisruptionWriter( matsimModel.getConfig() ) ;
+        this.monitorPersonsEnteringDangerZones = new MonitorPersonsInDangerZone(getAgentManager());
+
         if (opts == null) {
             return;
         }
@@ -209,24 +211,8 @@ public final class MATSimEvacModel implements ABMServerInterface, QueryPerceptIn
 
     private void processEmbersData(Geometry data, double now, Scenario scenario, Shape2XyWriter emberWriter) {
         log.debug("received embers data: {}", data);
-        if (data == null) {
-            return;
-        }
-        Geometry embersBuffer = data.buffer(optMaxDistanceForSmokeVisual);
-        List<Id<Person>> personsMatched = getPersonsWithin(scenario, embersBuffer);
-        if (!personsMatched.isEmpty()) {
-            log.info("Embers/smoke seen at time {} by {} persons ... use DEBUG to see full list",
-                    now, personsMatched.size());
-            log.debug("Embers/smoke seen by {} persons: {} ", personsMatched.size(), Arrays.toString(personsMatched.toArray()));
-        }
-        // package the messages up to send to the BDI side
-        for (Id<Person> personId : personsMatched) {
-            PAAgent agent = this.getAgentManager().getAgent(personId.toString());
-            if (agent != null) { // only do this if this is a BDI-like agent
-                PerceptContent pc = new PerceptContent(Constants.FIELD_OF_VIEW, Constants.SIGHTED_EMBERS);
-                getAgentManager().getAgentDataContainerV2().putPercept(agent.getAgentID(), Constants.FIELD_OF_VIEW, pc);
-            }
-        }
+        Geometry buffer = data.buffer(optMaxDistanceForSmokeVisual);
+        monitorPersonsEnteringDangerZones.setEmbersZone(getLinksWithin(scenario, buffer));
         emberWriter.write( now, data);
     }
 
@@ -325,27 +311,13 @@ public final class MATSimEvacModel implements ABMServerInterface, QueryPerceptIn
 
         {
             Geometry buffer = data.buffer(optMaxDistanceForFireVisual);
-            List<Id<Person>> personsMatched = getPersonsWithin(scenario, buffer);
-            if (!personsMatched.isEmpty()) {
-                log.info("Fire seen at time {} by {} persons ... use DEBUG to see full list",
-                        now, personsMatched.size());
-                log.debug("Fire seen by {} persons: {} ", personsMatched.size(), Arrays.toString(personsMatched.toArray()));
-            }
-            // package the messages up to send to the BDI side
-            for (Id<Person> personId : personsMatched) {
-                PAAgent agent = this.getAgentManager().getAgent(personId.toString());
-                if (agent != null) { // only do this if this is a BDI-like agent
-                    PerceptContent pc = new PerceptContent(Constants.FIELD_OF_VIEW, Constants.SIGHTED_FIRE);
-                    getAgentManager().getAgentDataContainerV2().putPercept(agent.getAgentID(), Constants.FIELD_OF_VIEW, pc);
-                }
-            }
+            monitorPersonsEnteringDangerZones.setFireZone(getLinksWithin(scenario, buffer));
         }
-//		https://stackoverflow.com/questions/38404095/how-to-calculate-the-distance-in-meters-between-a-geographic-point-and-a-given-p
+		//https://stackoverflow.com/questions/38404095/how-to-calculate-the-distance-in-meters-between-a-geographic-point-and-a-given-p
         {
             final double bufferWidth = optFireAvoidanceBufferForVehicles;
             Geometry buffer = data.buffer(bufferWidth);
             penaltyFactorsOfLinks.clear();
-//		Utils.penaltyMethod1(fire, buffer, penaltyFactorsOfLinks, scenario );
             Utils.penaltyMethod2(data, buffer, bufferWidth, penaltyFactorsOfLinks, scenario);
             // I think that penaltyMethod2 looks nicer than method1.  kai, dec'17
             // yy could make this settable, but for the time being this pedestrian approach
@@ -380,6 +352,24 @@ public final class MATSimEvacModel implements ABMServerInterface, QueryPerceptIn
         return personsWithin;
     }
 
+    /**
+     * Gets all links that have a fromNode within the given shape
+     * @param scenario
+     * @param shape
+     * @return
+     */
+    private Set<Id<Link>> getLinksWithin(Scenario scenario, Geometry shape) {
+        Set<Id<Link>> links = new HashSet<>();
+        for(Id<Link> linkId : scenario.getNetwork().getLinks().keySet()) {
+            final Link link = scenario.getNetwork().getLinks().get(linkId);
+            Point fromPoint = GeometryUtils.createGeotoolsPoint(link.getFromNode().getCoord());
+            if (shape.contains(fromPoint)) {
+                links.add(linkId);
+            }
+        }
+        return links;
+    }
+
 
     public void init(Object[] args) {
         String[] acts = Stream.of(Constants.EvacActivity.values()).map(Constants.EvacActivity::name).toArray(String[]::new);
@@ -399,6 +389,7 @@ public final class MATSimEvacModel implements ABMServerInterface, QueryPerceptIn
     }
 
     private void initialiseControllerForEvac(Controler controller) {
+        controller.getEvents().addHandler(monitorPersonsEnteringDangerZones);
         // infrastructure at QSim level (separating line not fully logical)
         controller.addOverridingQSimModule( new AbstractQSimModule() {
             @Override protected void configureQSim() {

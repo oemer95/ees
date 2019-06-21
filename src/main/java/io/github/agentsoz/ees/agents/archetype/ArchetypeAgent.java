@@ -53,8 +53,11 @@ import static org.matsim.core.utils.misc.Time.writeTime;
  *
  * author: dsingh
  */
-@AgentInfo(hasGoals={"io.github.agentsoz.ees.agents.bushfire.GoalDoNothing"})
-public abstract class ArchetypeAgent extends Agent implements io.github.agentsoz.bdiabm.Agent {
+@AgentInfo(hasGoals={
+        "io.github.agentsoz.abmjill.genact.EnvironmentAction",
+        "io.github.agentsoz.ees.agents.archetype.GotoLocationEvacuation"
+})
+public class ArchetypeAgent extends Agent implements io.github.agentsoz.bdiabm.Agent {
 
 
     //===============================================================================
@@ -63,7 +66,7 @@ public abstract class ArchetypeAgent extends Agent implements io.github.agentsoz
 
     private final Logger logger = LoggerFactory.getLogger(ArchetypeAgent.class);
 
-    private final int reactionTimeInSecs = 60;
+    private final int reactionTimeInSecs = 30;
 
     enum State {
         anxietyFromSituation,
@@ -85,7 +88,6 @@ public abstract class ArchetypeAgent extends Agent implements io.github.agentsoz
         //
         responseThresholdInitialReached,
         responseThresholdFinalReached,
-        willEvaluateFullSituationAtFutureTime,
     }
     
     enum Beliefname {
@@ -164,7 +166,7 @@ public abstract class ArchetypeAgent extends Agent implements io.github.agentsoz
      * Constructor.
      * Use {@link #start(PrintStream, String[])} instead
      * to perform any agent specific initialisation.
-     * @param name
+     * @param name name of this agent
      */
     public ArchetypeAgent(String name) {
         super(name);
@@ -195,27 +197,51 @@ public abstract class ArchetypeAgent extends Agent implements io.github.agentsoz
     }
 
     Goal prepareDrivingGoal(Constants.EvacActivity activity, Location location, Constants.EvacRoutingMode routingMode) {
-        // perceive congestion and blockage events always
-        EnvironmentAction action = new EnvironmentAction(
-                Integer.toString(getId()),
-                Constants.PERCEIVE,
-                new Object[] {Constants.BLOCKED, Constants.CONGESTION});
-        post(action);
-        addActiveEnvironmentAction(action);
-
-        Object[] params = new Object[6];
+        Object[] params = new Object[7];
         params[0] = Constants.DRIVETO;
         params[1] = location.getCoordinates();
         params[2] = getTime() + 5.0; // five secs from now;
         params[3] = routingMode;
         params[4] = activity.toString();
-        params[5] = true; // add zero-time replan activity to mark location/time of replanning
-        action = new EnvironmentAction(
+        params[5] = true; // add replan activity to mark location/time of replanning
+        params[6] = Global.getRandom().nextInt(reactionTimeInSecs);
+        EnvironmentAction action = new EnvironmentAction(
                 Integer.toString(getId()),
                 Constants.DRIVETO, params);
         addActiveEnvironmentAction(action); // will be reset by updateAction()
         return action;
     }
+
+    private void evaluateSituation() {
+        try {
+            // get values of anxiety and the thresholds
+            double anxiety = Double.valueOf(getBelief(State.anxietyFromSituation.name()))
+                    + Double.valueOf(getBelief(State.anxietyFromEmergencyMessages.name()))
+                    + Double.valueOf(getBelief(State.anxietyFromSocialMessages.name()));
+            double initialResponseThreshold = Double.valueOf(getBelief(Beliefname.ResponseThresholdInitial.name()));
+            double finalResponseThreshold = Double.valueOf(getBelief(Beliefname.ResponseThresholdInitial.name()));
+
+            // and whether we already know if the thresholds are reached
+            boolean initialThresholdReached = Boolean.valueOf(getBelief(State.responseThresholdInitialReached.name()));
+            boolean finalThresholdReached = Boolean.valueOf(getBelief(State.responseThresholdFinalReached.name()));
+
+            // if either threshold was just reached, then react now
+            if ((!initialThresholdReached && (anxiety >= initialResponseThreshold)) ||
+                    (!finalThresholdReached &&  (anxiety >= finalResponseThreshold)))
+            {
+                if (!initialThresholdReached && (anxiety >= initialResponseThreshold)) {
+                    initialThresholdReached = true;
+                    believe(State.responseThresholdInitialReached.name(), Boolean.toString(initialThresholdReached));
+                    post(new GotoLocationEvacuation(GotoLocationEvacuation.class.getSimpleName()));
+                }
+                if (!finalThresholdReached && (anxiety >= finalResponseThreshold)) {
+                    finalThresholdReached = true;
+                    believe(State.responseThresholdFinalReached.name(), Boolean.toString(finalThresholdReached));
+                }
+            }
+        } catch (Exception e) {}
+    }
+
 
     //===============================================================================
     //endregion
@@ -233,66 +259,61 @@ public abstract class ArchetypeAgent extends Agent implements io.github.agentsoz
     private void handleTime(Object parameters) {
         if (parameters instanceof Double) {
             setTime((double) parameters);
-            evaluateSituation();
         }
     }
 
-    private void evaluateSituation() {
-        try {
-            String val = getBelief(State.willEvaluateFullSituationAtFutureTime.name());
-            double reactTime = parseTime(val);
-            if (reactTime >= 0 && reactTime <= getTime()) {
-                // check if either threshold was reached
-                double anxiety = Double.valueOf(getBelief(State.anxietyFromSituation.name()))
-                        + Double.valueOf(getBelief(State.anxietyFromEmergencyMessages.name()))
-                        + Double.valueOf(getBelief(State.anxietyFromSocialMessages.name()));
-                double initialResponseThreshold = Double.valueOf(getBelief(Beliefname.ResponseThresholdInitial.name()));
-                double finalResponseThreshold = Double.valueOf(getBelief(Beliefname.ResponseThresholdInitial.name()));
-                boolean initialThresholdReached = anxiety >= initialResponseThreshold;
-                boolean finalThresholdReached = anxiety >= finalResponseThreshold;
-                // if threshold was reached then act now, else re-evaluate later
-                if (initialThresholdReached || finalThresholdReached) {
-                    believe(State.responseThresholdInitialReached.name(), Boolean.toString(initialThresholdReached));
-                    believe(State.responseThresholdFinalReached.name(), Boolean.toString(finalThresholdReached));
-                    believe(State.willEvaluateFullSituationAtFutureTime.name(), null);
-                    post(new GotoLocationEvacuation(GotoLocationEvacuation.class.getSimpleName()));
-                } else {
-                    double futureTime = getTime() + Global.getRandom().nextInt(reactionTimeInSecs);
-                    believe(State.willEvaluateFullSituationAtFutureTime.name(), writeTime(futureTime));
-                }
-            }
-        } catch (Exception e) {}
+    private void handleArrived(Object parameters) {
+        record("stopped driving");
     }
 
-    private void handleArrived(Object parameters) {
+    private void handleDeparted(Object parameters) {
+        record("started driving to " + ((Map<String,String>)parameters).get("actType"));
+    }
+
+    private void handleActivityStarted(Object parameters) {
+        record("started activity " + ((Map<String,String>)parameters).get("actType"));
+    }
+
+    private void handleActivityEnded(Object parameters) {
+        record("finished activity " + ((Map<String,String>)parameters).get("actType"));
     }
 
     private void handleBlocked(Object parameters) {
+        record("is blocked and will replan");
+        EnvironmentAction action = new EnvironmentAction(
+                Integer.toString(getId()),
+                Constants.REPLAN_CURRENT_DRIVETO,
+                new Object[] {Constants.EvacRoutingMode.carGlobalInformation});
+        addActiveEnvironmentAction(action); // will be reset by updateAction()
+        post(action);
     }
 
     private void handleCongestion(Object parameters) {
+        record("is in congestion and will replan");
+        EnvironmentAction action = new EnvironmentAction(
+                Integer.toString(getId()),
+                Constants.REPLAN_CURRENT_DRIVETO,
+                new Object[] {Constants.EvacRoutingMode.carGlobalInformation});
+        addActiveEnvironmentAction(action); // will be reset by updateAction()
+        post(action);
     }
 
     private void handleFieldOfView(Object view) {
         if (view == null) {
             return;
         }
-        out("sensed " + view);
+        record("saw " + view);
         if (Constants.SIGHTED_EMBERS.equalsIgnoreCase(view.toString())) {
             double effect = Double.valueOf(getBelief(State.futureValueOfVisibleEmbers.name()));
             double barometer = Double.valueOf(getBelief(State.anxietyFromSituation.name()));
             believe(State.anxietyFromSituation.name(), Double.toString(barometer+effect));
             believe(State.futureValueOfVisibleEmbers.name(), "0.0");
-            double futureTime = getTime() + Global.getRandom().nextInt(reactionTimeInSecs);
-            believe(State.willEvaluateFullSituationAtFutureTime.name(), writeTime(futureTime));
 
         } else if (Constants.SIGHTED_FIRE.equalsIgnoreCase(view.toString())) {
             double effect = Double.valueOf(getBelief(State.futureValueOfVisibleFire.name()));
             double barometer = Double.valueOf(getBelief(State.anxietyFromSituation.name()));
             believe(State.anxietyFromSituation.name(), Double.toString(barometer+effect));
             believe(State.futureValueOfVisibleFire.name(), "0.0");
-            double futureTime = getTime() + Global.getRandom().nextInt(reactionTimeInSecs);
-            believe(State.willEvaluateFullSituationAtFutureTime.name(), writeTime(futureTime));
         } else {
             logger.error("{} ignoring field of view percept: {}", logPrefix(), view);
             return;
@@ -376,7 +397,7 @@ public abstract class ArchetypeAgent extends Agent implements io.github.agentsoz
         try {
             removeIfExists(key, value);
             addBelief(beliefSetName, key, value);
-            out("believes " + key + "=" + value);
+            record("believes " + key + "=" + value);
         } catch (BeliefBaseException e) {
             throw new RuntimeException(e);
         }
@@ -464,7 +485,6 @@ public abstract class ArchetypeAgent extends Agent implements io.github.agentsoz
         believe(State.futureValueOfVisibleFire.name(), getBelief(Beliefname.ImpactFromVisibleFire.name()));
         believe(State.futureValueOfVisibleSmoke.name(), getBelief(Beliefname.ImpactFromVisibleSmoke.name()));
         //
-        believe(State.willEvaluateFullSituationAtFutureTime.name(), null);
         believe(State.responseThresholdInitialReached.name(), null);
         believe(State.responseThresholdFinalReached.name(), null);
 
@@ -547,17 +567,23 @@ public abstract class ArchetypeAgent extends Agent implements io.github.agentsoz
         // Write out my beliefs
         for(Beliefname beliefname : Beliefname.values()) {
             String value = getBelief(beliefname.toString());
-            out("believes " + beliefname.name() + "=" + value + " #" + beliefname.getCommonName());
+            record("believes " + beliefname.name() + "=" + value + " #" + beliefname.getCommonName());
         }
 
         // Initialise behaviour attributes from initial beliefs
         initialiseBeliefs();
 
-        // perceive congestion and blockage events always
+        // register to perceive certain events
         EnvironmentAction action = new EnvironmentAction(
                 Integer.toString(getId()),
                 Constants.PERCEIVE,
-                new Object[] {Constants.BLOCKED, Constants.CONGESTION});
+                new Object[] {
+                        Constants.BLOCKED,
+                        Constants.CONGESTION,
+                        Constants.ARRIVED,
+                        Constants.DEPARTED,
+                        Constants.ACTIVITY_STARTED,
+                        Constants.ACTIVITY_ENDED});
         post(action);
         addActiveEnvironmentAction(action);
     }
@@ -653,6 +679,15 @@ public abstract class ArchetypeAgent extends Agent implements io.github.agentsoz
             case Constants.ARRIVED:
                 handleArrived(parameters);
                 break;
+            case Constants.DEPARTED:
+                handleDeparted(parameters);
+                break;
+            case Constants.ACTIVITY_STARTED:
+                handleActivityStarted(parameters);
+                break;
+            case Constants.ACTIVITY_ENDED:
+                handleActivityEnded(parameters);
+                break;
             case Constants.BLOCKED:
                 handleBlocked(parameters);
                 break;
@@ -672,6 +707,9 @@ public abstract class ArchetypeAgent extends Agent implements io.github.agentsoz
                 logger.warn("{} received unknown percept '{}'", logPrefix(), perceptID);
 
         }
+
+        // evaluate the situation always
+        evaluateSituation();
     }
 
     /**
@@ -714,7 +752,7 @@ public abstract class ArchetypeAgent extends Agent implements io.github.agentsoz
     }
     class Prefix{
         public String toString() {
-            return String.format("Time %9s %s %-4s : ", getTimeString(), ArchetypeAgent.class.getSimpleName(), getId());
+            return String.format("%8s|%s|%-5s|", getTimeString(), ArchetypeAgent.class.getSimpleName(), getId());
         }
     }
 
@@ -725,6 +763,12 @@ public abstract class ArchetypeAgent extends Agent implements io.github.agentsoz
     void out(String msg) {
         if (writer != null) {
             writer.println(logPrefix() + msg);
+        }
+    }
+
+    void record(String msg) {
+        if (msg != null) {
+            out(msg + " @@");
         }
     }
 
