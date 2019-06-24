@@ -80,8 +80,9 @@ public class JillBDIModel extends JillModel implements DataClient {
 	// Map<Time,Agent> of scheduled fire alertPercepts
 	private PriorityQueue<TimedAlert> alertPercepts;
 
+
 	Map<String, DiffusedContent> contentsMap;
-	HashMap<String,Set<String>> informedAgents;
+//	HashMap<String,Set<String>> informedAgents;
 
 	private int evacPeak = 0;
 	private int[] evacStartHHMM = {0,0};
@@ -93,7 +94,7 @@ public class JillBDIModel extends JillModel implements DataClient {
 	public JillBDIModel(String[] initArgs) {
 		super();
 		contentsMap = new HashMap<>();
-		informedAgents = new HashMap<>();
+//		informedAgents = new HashMap<>();
 		mapMATsimToJillIds = new LinkedHashMap<String,String>();
 		mapJillToMATsimIds = new LinkedHashMap<String,String>();
 		this.initArgs = initArgs;
@@ -386,7 +387,7 @@ public class JillBDIModel extends JillModel implements DataClient {
 		evacPeak = peak;
 	}
 
-	private void sendSocialNetworkMessagesToAgents(AgentDataContainer adc) {
+	protected void sendSocialNetworkMessagesToAgents(AgentDataContainer adc) {
 
 		for (String id : contentsMap.keySet()) {
 			DiffusedContent diffusedContent  = contentsMap.get(id);
@@ -444,6 +445,8 @@ public class JillBDIModel extends JillModel implements DataClient {
 		}
 	}
 
+
+
 	/**
 	 * Creates a listener for each type of message we expect from the DataServer
 	 * @return
@@ -477,6 +480,9 @@ public class JillBDIModel extends JillModel implements DataClient {
 
 		return listeners;
 	}
+
+
+
 	public void useSequenceLock(Object sequenceLock) {
 		this.sequenceLock = sequenceLock;
 	}
@@ -484,5 +490,18 @@ public class JillBDIModel extends JillModel implements DataClient {
 	protected Object getSequenceLock() {
 		return sequenceLock;
 	}
+
+	public Map<String, DiffusedContent> getContentsMap() {
+		return contentsMap;
+	}
+
+	public void setContentsMap(Map<String, DiffusedContent> contentsMap) {
+		this.contentsMap = contentsMap;
+	}
+
+	public DataServer getDataServer() {
+		return dataServer;
+	}
+
 
 }

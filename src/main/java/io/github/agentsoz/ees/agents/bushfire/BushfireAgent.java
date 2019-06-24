@@ -485,9 +485,9 @@ public abstract class BushfireAgent extends  Agent implements io.github.agentsoz
     }
 
     private void shareWithSocialNetwork(String content) {
-        SNUpdates snUpdates = new SNUpdates(this.getId());
+        SNUpdates snUpdates = new SNUpdates();
 
-        String[] msg = {content};
+        String[] msg = {content,String.valueOf(this.getId())};
         snUpdates.getContentsMap().put(Constants.EVACUATION_INFLUENCE,msg);
         memorise(MemoryEventType.ACTIONED.name(), Constants.BDI_REASONING_UPDATES
                 + ":" + Constants.EVACUATION_INFLUENCE + ":" + content);

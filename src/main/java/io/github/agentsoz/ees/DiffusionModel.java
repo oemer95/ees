@@ -200,41 +200,45 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
 
         switch (dataType) {
             case Constants.BDI_REASONING_UPDATES: // update Diffusion model based on BDI updates
+
+                //create the data structure that is passed to the BDI side
+                SNUpdates newUpdates = (SNUpdates) data;
+
                 if (!(data instanceof SNUpdates)) {
                     logger.error("received unknown data: " + data.toString());
                     break;
                 }
 
-                SNUpdates newUpdates = (SNUpdates) data;
-                String agentId = String.valueOf(newUpdates.getAgentId());
 
-                //process local contents
-                for(String localContent: newUpdates.getContentsMap().keySet()){
-                    logger.debug("Agent {} received local content type {}. Message: {}",agentId,localContent);
-                    Set<String> agents = (localContentFromAgents.containsKey(localContent)) ? localContentFromAgents.get(localContent) :
-                            new HashSet<>();
-                    agents.add(agentId);
-                    localContentFromAgents.put(localContent, agents);
-                    String[] params = (String[])newUpdates.getContentsMap().get(localContent);
-                    String msg = params[0];   // do something with parameters
-                }
-
-                //process global (broadcast) contents
-                for(String globalContent: newUpdates.getBroadcastContentsMap().keySet()){
-                    logger.debug("received global content " + globalContent);
-                    if(!globalContentFromAgents.contains(globalContent)) {
-                        globalContentFromAgents.add(globalContent);
+                    //process local contents
+                    for(String localContent: newUpdates.getContentsMap().keySet()){
+                        String[] contents = (String[]) newUpdates.getContentsMap().get(localContent);
+                        String msg = contents[0];
+                        String agentId = contents[1];
+                        // do something with parameters
+                        logger.debug("Agent {} received local content type {}. Message: {}",agentId,localContent);
+                        Set<String> agents = (localContentFromAgents.containsKey(localContent)) ? localContentFromAgents.get(localContent) :
+                                new HashSet<>();
+                        agents.add(agentId);
+                        localContentFromAgents.put(localContent, agents);
                     }
-                    String[] params = (String[])newUpdates.getContentsMap().get(globalContent);
-                    // do something with parameters
 
-                }
+                    //process global (broadcast) contents
+                    for(String globalContent: newUpdates.getBroadcastContentsMap().keySet()){
+                        logger.debug("received global content " + globalContent);
+                        if(!globalContentFromAgents.contains(globalContent)) {
+                            globalContentFromAgents.add(globalContent);
+                        }
+                        String[] params = (String[])newUpdates.getContentsMap().get(globalContent);
+                        // do something with parameters
 
-                //process SN actions
-                for(String action: newUpdates.getSNActionsMap().keySet()){
-                    Object[] params = newUpdates.getContentsMap().get(action);
-                    // do something with parameters
-                }
+                    }
+
+                    //process SN actions
+                    for(String action: newUpdates.getSNActionsMap().keySet()){
+                        Object[] params = newUpdates.getContentsMap().get(action);
+                        // do something with parameters
+                    }
                 break;
             default:
                 throw new RuntimeException("Unknown data type received: " + dataType);

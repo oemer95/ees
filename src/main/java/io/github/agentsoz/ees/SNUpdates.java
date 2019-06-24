@@ -26,15 +26,15 @@ import java.util.HashMap;
 
 public class SNUpdates {
 
-    private int agentId;
+
     private HashMap<String,Object[]> contentsMap; // content type, parameters
     private HashMap<String,Object[]> broadcastContentsMap; // contents that should be broadcasted to all agents in the social netwotrk.
     private HashMap<String,Object[]> snActions; // action type, parameters
 
 
 
-    public SNUpdates(int id){
-        this.agentId = id;
+    public SNUpdates(){
+
         this.contentsMap = new HashMap<>();
         this.broadcastContentsMap = new HashMap<>();
         this.snActions = new HashMap<>();
@@ -53,8 +53,5 @@ public class SNUpdates {
         return contentsMap;
     }
 
-    public int getAgentId() {
-        return agentId;
-    }
 
 }

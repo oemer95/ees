@@ -34,7 +34,7 @@ public class DiffusedContent {
     public DiffusedContent()
     {
 
-        this.contentsMap = new HashMap<String,Object[]>();
+        this.contentsMap = new HashMap<>();
     }
 
 
