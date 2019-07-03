@@ -189,7 +189,8 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusionDat
         }
 
         double currentTime = Time.convertTime(timestep, timestepUnit, Time.TimestepUnit.MINUTES);
-        SortedMap<Double, DiffusionDataContainer> periodicDiffusionData =   allStepsDiffusionData.subMap(lastUpdateTimeInMinutes,currentTime);
+        //+1 to avoid returning empty map for diffusion data for first step (toKey = fromKey)
+        SortedMap<Double, DiffusionDataContainer> periodicDiffusionData =   allStepsDiffusionData.subMap(lastUpdateTimeInMinutes,currentTime+1);
         lastUpdateTimeInMinutes = currentTime;
 
         return (currentStepDataContainer.getDiffusionDataMap().isEmpty()) ? null : periodicDiffusionData;
