@@ -23,7 +23,6 @@ package io.github.agentsoz.ees;
  */
 
 
-import io.github.agentsoz.bdiabm.data.ActionPerceptContainer;
 import io.github.agentsoz.dataInterface.DataClient;
 import io.github.agentsoz.dataInterface.DataServer;
 import io.github.agentsoz.dataInterface.DataSource;
@@ -37,7 +36,7 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 
 
-public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent>>, DataClient<Object> {
+public class DiffusionModel implements DataSource<SortedMap<Double, DiffusionDataContainer>>, DataClient<Object> {
 
     private final Logger logger = LoggerFactory.getLogger(DiffusionModel.class);
 
@@ -51,6 +50,7 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
     private String configFile = null;
     private List<String> agentsIds = null;
 
+    private TreeMap<Double,DiffusionDataContainer> allStepsDiffusionData;
 
     Map<String, Set> localContentFromAgents;
     ArrayList<String> globalContentFromAgents;
@@ -59,6 +59,7 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
         this.snManager = (configFile==null) ? null : new SocialNetworkManager(configFile);
         this.localContentFromAgents = new HashMap<>();
         this.globalContentFromAgents =  new ArrayList<String>();
+        this.allStepsDiffusionData =  new TreeMap<>();
     }
 
     public DiffusionModel(Map<String, String> opts, DataServer dataServer, List<String> agentsIds) {
@@ -66,6 +67,7 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
         this.snManager = (configFile==null) ? null : new SocialNetworkManager(configFile);
         this.localContentFromAgents = new HashMap<>();
         this.globalContentFromAgents =  new ArrayList<String>();
+        this.allStepsDiffusionData =  new TreeMap<>();
         this.dataServer = dataServer;
         this.agentsIds = agentsIds;
     }
@@ -105,15 +107,16 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
         this.snManager.genNetworkAndDiffModels(); // setup configs, gen network and diffusion models
         this.snManager.printSNModelconfigs();
         //subscribe to BDI data updates
-      //  this.dataServer.subscribe(this, Constants.SOCIAL_NETWORK_CONTENT);
-        this.dataServer.subscribe(this, Constants.BDI_REASONING_UPDATES);
+      //  this.dataServer.subscribe(this, Constants.DIFFUSION_UPDATES_FROM_BDI_AGENT);
+        this.dataServer.subscribe(this, Constants.DIFFUSION_DATA_CONTAINDER_FROM_BDI);
     }
 
-    protected void stepDiffusionProcess(HashMap<String,DiffusedContent> allAgentContentsMap) {
+    protected void stepDiffusionProcess(DiffusionDataContainer dataContainer, double timestep) {
         snManager.diffuseContent(); // step the diffusion model
+
         if (snManager.getDiffModel() instanceof ICModel) {
             ICModel icModel = (ICModel) snManager.getDiffModel();
-            icModel.recordCurrentStepSpread(dataServer.getTime());
+            icModel.recordCurrentStepSpread(timestep);
 
             HashMap<String, ArrayList<String>> latestUpdate = icModel.getLatestDiffusionUpdates();
             if (!latestUpdate.isEmpty()) {
@@ -121,39 +124,36 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
                 for(Map.Entry<String,ArrayList<String>> contents: latestUpdate.entrySet()) {
                     String contentType = contents.getKey();
                     ArrayList<String> agentIDs = contents.getValue();
+                    logger.info("{} agents activated at time {} for content {}", agentIDs.toString(),timestep,contentType);
 
-                    for(String id: agentIDs) { // for each agent create a DiffusedContent and put content type and parameters
-                        DiffusedContent content = getOrCreateDiffusedContent(id,allAgentContentsMap);
+                    for(String id: agentIDs) { // for each agent create a DiffusionContent and put content type and parameters
+                     //   DiffusionContent content = dataContainer.getOrCreateDiffusedContent(id);
                         String[] params = {Constants.ACTIVE};
-                        content.getContentsMap().put(contentType,params );
+                        dataContainer.putContentToContentsMapFromDiffusionModel(id,contentType, params);
+                      //  content.getContentsMapFromDiffusionModel().put(contentType,params );
                     }
                 }
 
-                logger.debug("put timed diffusion updates for ICModel at {}", dataServer.getTime());
-            }
+                    this.allStepsDiffusionData.put(timestep, dataContainer);
+
+                }
+
         }
 
 
     }
 
-    public DiffusedContent getOrCreateDiffusedContent(String agentId, HashMap<String,DiffusedContent> diffusedContentsMap) {
-        DiffusedContent content = diffusedContentsMap.get(agentId);
-        if (content == null) {
-            content = new DiffusedContent();
-            diffusedContentsMap.put(agentId, content);
-        }
 
-        return content;
-    }
     @Override
-    public HashMap<String,DiffusedContent> sendData(double timestep, String dataType) {
+    public SortedMap<Double, DiffusionDataContainer> sendData(double timestep, String dataType) {
         Double nextTime = timestep + SNConfig.getDiffturn();
 
-        //create the data structure that is passed to the BDI side
-        HashMap<String, DiffusedContent> currentStepDiffusedContents = new HashMap<>();
+        // create data structure to store current step contents and params
+        DiffusionDataContainer currentStepDataContainer =  new DiffusionDataContainer();
+
 
         if (nextTime != null) {
-            dataServer.registerTimedUpdate(Constants.DIFFUSION, this, nextTime);
+            dataServer.registerTimedUpdate(Constants.DIFFUSION_DATA_CONTAINER_FROM_DIFFUSION_MODEL, this, nextTime);
             // update the model with any new messages form agents
             ICModel icModel = (ICModel) this.snManager.getDiffModel();
 
@@ -166,8 +166,8 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
                         newSet[i] = (String)set[i];
                     }
                     map.put(key,newSet);
-                    logger.info(String.format("At time %.0f, total %d agents will spread new message: %s", timestep, newSet.length, key));
-                    logger.info("Agents spreading new message are: {}", Arrays.toString(newSet));
+                    logger.info(String.format("At time %.0f, total %d agents received content %s from BDI Model.", timestep, newSet.length, key));
+                    logger.info("Agents spreading content are: {}", Arrays.toString(newSet));
                 }
                 icModel.updateSocialStatesFromLocalContent(map);
             }
@@ -179,8 +179,8 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
 
             }
 
-            // step the model before begin called again
-            stepDiffusionProcess(currentStepDiffusedContents);
+            // step the models and update data container
+            stepDiffusionProcess(currentStepDataContainer,timestep);
 
             // clear the contents
             globalContentFromAgents.clear();
@@ -189,8 +189,10 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
         }
 
         double currentTime = Time.convertTime(timestep, timestepUnit, Time.TimestepUnit.MINUTES);
+        SortedMap<Double, DiffusionDataContainer> periodicDiffusionData =   allStepsDiffusionData.subMap(lastUpdateTimeInMinutes,currentTime);
         lastUpdateTimeInMinutes = currentTime;
-        return (currentStepDiffusedContents.isEmpty()) ? null : currentStepDiffusedContents;
+
+        return (currentStepDataContainer.getDiffusionDataMap().isEmpty()) ? null : periodicDiffusionData;
 
     }
 
@@ -199,46 +201,59 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
     public void receiveData(double time, String dataType, Object data) { // data package from the BDI side
 
         switch (dataType) {
-            case Constants.BDI_REASONING_UPDATES: // update Diffusion model based on BDI updates
+            case Constants.DIFFUSION_DATA_CONTAINDER_FROM_BDI: // update Diffusion model based on BDI updates
 
-                //create the data structure that is passed to the BDI side
-                SNUpdates newUpdates = (SNUpdates) data;
+                DiffusionDataContainer dataContainer = (DiffusionDataContainer) data;
 
-                if (!(data instanceof SNUpdates)) {
+                if (!(data instanceof DiffusionDataContainer)) {
                     logger.error("received unknown data: " + data.toString());
                     break;
                 }
 
+                    for (Map.Entry entry : dataContainer.getDiffusionDataMap().entrySet()) {
 
-                    //process local contents
-                    for(String localContent: newUpdates.getContentsMap().keySet()){
-                        String[] contents = (String[]) newUpdates.getContentsMap().get(localContent);
-                        String msg = contents[0];
-                        String agentId = contents[1];
-                        // do something with parameters
-                        logger.debug("Agent {} received local content type {}. Message: {}",agentId,localContent);
-                        Set<String> agents = (localContentFromAgents.containsKey(localContent)) ? localContentFromAgents.get(localContent) :
-                                new HashSet<>();
-                        agents.add(agentId);
-                        localContentFromAgents.put(localContent, agents);
-                    }
+                    String agentId = (String) entry.getKey();
+                    DiffusionContent dc = (DiffusionContent) entry.getValue();
 
-                    //process global (broadcast) contents
-                    for(String globalContent: newUpdates.getBroadcastContentsMap().keySet()){
-                        logger.debug("received global content " + globalContent);
-                        if(!globalContentFromAgents.contains(globalContent)) {
-                            globalContentFromAgents.add(globalContent);
+                        //process local contents from the BDI model
+                        if(!dc.getContentsMapFromBDIModel().isEmpty()){
+                            for(String localContent: dc.getContentsMapFromBDIModel().keySet()){
+                                String[] contents = (String[]) dc.getContentsMapFromBDIModel().get(localContent);
+                                String msg = contents[0];
+                                // do something with parameters
+
+                                logger.debug("Agent {} received local content type {}. Message: {}",agentId,localContent, msg);
+                                Set<String> agents = (localContentFromAgents.containsKey(localContent)) ? localContentFromAgents.get(localContent) :
+                                        new HashSet<>();
+                                agents.add(agentId);
+                                localContentFromAgents.put(localContent, agents);
+                            }
                         }
-                        String[] params = (String[])newUpdates.getContentsMap().get(globalContent);
-                        // do something with parameters
 
+
+                        //process global (broadcast) contents from BDI model
+                        if(!dc.getBroadcastContentsMapFromBDIModel().isEmpty()){
+                            for(String globalContent: dc.getBroadcastContentsMapFromBDIModel().keySet()){
+                                logger.debug("received global content " + globalContent);
+                                if(!globalContentFromAgents.contains(globalContent)) {
+                                    globalContentFromAgents.add(globalContent);
+                                }
+                                String[] params = (String[])dc.getBroadcastContentsMapFromBDIModel().get(globalContent);
+                                // do something with parameters
+
+                            }
+                        }
+
+
+                        //process SN actions
+                        if(!dc.getSnActionsMapFromBDIModel().isEmpty()){
+                            for(String action: dc.getSnActionsMapFromBDIModel().keySet()){
+                                Object[] params = dc.getSnActionsMapFromBDIModel().get(action);
+                                // do something with parameters
+                            }
+                        }
                     }
 
-                    //process SN actions
-                    for(String action: newUpdates.getSNActionsMap().keySet()){
-                        Object[] params = newUpdates.getContentsMap().get(action);
-                        // do something with parameters
-                    }
                 break;
             default:
                 throw new RuntimeException("Unknown data type received: " + dataType);
@@ -260,7 +275,7 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
         if (snManager != null) {
             init(agentsIds);
             setTimestepUnit(Time.TimestepUnit.MINUTES);
-            dataServer.registerTimedUpdate(Constants.DIFFUSION, this, Time.convertTime(startTimeInSeconds, Time.TimestepUnit.SECONDS, timestepUnit));
+            dataServer.registerTimedUpdate(Constants.DIFFUSION_DATA_CONTAINER_FROM_DIFFUSION_MODEL, this, Time.convertTime(startTimeInSeconds, Time.TimestepUnit.SECONDS, timestepUnit));
         } else {
             logger.warn("started but will be idle forever!!");
         }
@@ -273,7 +288,7 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
     public void start(int[] hhmm) {
         double startTimeInSeconds = Time.convertTime(hhmm[0], Time.TimestepUnit.HOURS, Time.TimestepUnit.SECONDS)
                 + Time.convertTime(hhmm[1], Time.TimestepUnit.MINUTES, Time.TimestepUnit.SECONDS);
-        dataServer.registerTimedUpdate(Constants.DIFFUSION, this, startTimeInSeconds);
+        dataServer.registerTimedUpdate(Constants.DIFFUSION_DATA_CONTAINER_FROM_DIFFUSION_MODEL, this, startTimeInSeconds);
     }
 
 
@@ -309,11 +324,6 @@ public class DiffusionModel implements DataSource<HashMap<String,DiffusedContent
         return snManager;
     }
 
-    public Map<String, Set> getLocalContentFromAgents() {
-        return localContentFromAgents;
-    }
-    public ArrayList<String> getGlobalContentFromAgents() {
-        return globalContentFromAgents;
-    }
+
 
 }

@@ -72,7 +72,8 @@ public abstract class BushfireAgent extends  Agent implements io.github.agentsoz
     private double smokeVisualValue = 0.3;
     private double fireVisualValue = 1.0;
     private double socialMessageEvacNowValue = 0.3;
-
+    private DiffusionContent diffusionContent = null;
+    private boolean publishDiffusionContent = false;
 
     enum MemoryEventType {
         BELIEVED,
@@ -230,13 +231,14 @@ public abstract class BushfireAgent extends  Agent implements io.github.agentsoz
             return;
         }
 
+        resetDiffusionContent();
         // save it to memory
         memorise(MemoryEventType.PERCEIVED.name(), perceptID + ":" +parameters.toString());
 
         if (perceptID.equals(Constants.EMERGENCY_MESSAGE)) {
             updateResponseBarometerMessages(parameters);
-        } else if (perceptID.equals(Constants.SOCIAL_NETWORK_CONTENT)) {
-            DiffusedContent diffusedContent = (DiffusedContent) parameters;
+        } else if (perceptID.equals(Constants.DIFFUSION_CONTENT)) {
+            DiffusionContent diffusedContent = (DiffusionContent) parameters;
             //process diffusedContent
 
            // updateResponseBarometerSocialMessage(parameters);
@@ -256,6 +258,32 @@ public abstract class BushfireAgent extends  Agent implements io.github.agentsoz
 
         // Now trigger a response as needed
         checkBarometersAndTriggerResponseAsNeeded();
+
+        //finally, publish diffusion content updates
+        sendDiffusionContentToBDIModel();
+    }
+
+    protected void sendDiffusionContentToBDIModel() {
+        if(publishDiffusionContent){
+            Object[] data = {String.valueOf(this.getId()),diffusionContent};
+            DataServer.getInstance(Run.DATASERVER).publish(Constants.DIFFUSION_UPDATES_FROM_BDI_AGENT, data);
+            publishDiffusionContent = false;
+        }
+    }
+
+    protected void resetDiffusionContent() {
+        if(this.diffusionContent != null) {
+            this.diffusionContent = null;
+        }
+    }
+
+    public  DiffusionContent getOrCreateDiffusionContent() {
+
+        if (this.diffusionContent == null) {
+            diffusionContent = new DiffusionContent();
+        }
+
+        return diffusionContent;
     }
 
     private void handleSocialPercept(String perceptID, Object parameters) {
@@ -268,14 +296,14 @@ public abstract class BushfireAgent extends  Agent implements io.github.agentsoz
                 !messagesShared.contains(EmergencyMessage.EmergencyMessageType.EVACUATE_NOW.name()) &&
                 parameters instanceof String &&
                 getEmergencyMessageType(parameters) == EmergencyMessage.EmergencyMessageType.EVACUATE_NOW) {
-            shareWithSocialNetwork((String) parameters);
+            shareWithSocialNetwork(Constants.EVACUATION_INFLUENCE,(String) parameters);
             messagesShared.add(getEmergencyMessageType(parameters).name());
         }
         // Spread BLOCKED for given blocked link if haven't already
         if (perceptID.equals(Constants.BLOCKED)) {
             String blockedMsg = Constants.BLOCKED + parameters.toString();
             if (!messagesShared.contains(blockedMsg)) {
-                shareWithSocialNetwork(blockedMsg);
+                shareWithSocialNetwork(Constants.BLOCKAGE_INFLUENCE,blockedMsg);
                 messagesShared.add(blockedMsg);
             }
         }
@@ -484,14 +512,14 @@ public abstract class BushfireAgent extends  Agent implements io.github.agentsoz
         return type;
     }
 
-    private void shareWithSocialNetwork(String content) {
-        SNUpdates snUpdates = new SNUpdates();
+    private void shareWithSocialNetwork(String contentType, String content) {
+        DiffusionContent dc =  getOrCreateDiffusionContent();
+        String[] params = {content};
 
-        String[] msg = {content,String.valueOf(this.getId())};
-        snUpdates.getContentsMap().put(Constants.EVACUATION_INFLUENCE,msg);
-        memorise(MemoryEventType.ACTIONED.name(), Constants.BDI_REASONING_UPDATES
-                + ":" + Constants.EVACUATION_INFLUENCE + ":" + content);
-        DataServer.getInstance(Run.DATASERVER).publish(Constants.BDI_REASONING_UPDATES, snUpdates);
+        dc.getContentsMapFromBDIModel().put(contentType,params); // update diffusionContent
+        memorise(MemoryEventType.ACTIONED.name(), Constants.DIFFUSION_UPDATES_FROM_BDI_AGENT
+                + ":" + contentType + ":" + content);
+        publishDiffusionContent = true; //  publish diffusion data to Dataserver
     }
 
     /**

@@ -41,7 +41,7 @@
     <!--seed = percentage of initially active agents (%)-->
     <!--diffusion_probaility: mean diffusion probability that is varied using a standard deviation (sigma) to randomly draw probabilities from a gaussian distribution-->
 <ic>
-    <step_size>10</step_size>
+    <step_size>60</step_size>
 	<seeding_strategy seed="53">random</seeding_strategy>
     <diffusion_probability sigma="0.05">0.5</diffusion_probability>
 </ic>

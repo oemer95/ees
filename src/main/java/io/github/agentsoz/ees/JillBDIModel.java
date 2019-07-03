@@ -80,9 +80,8 @@ public class JillBDIModel extends JillModel implements DataClient {
 	// Map<Time,Agent> of scheduled fire alertPercepts
 	private PriorityQueue<TimedAlert> alertPercepts;
 
-
-	Map<String, DiffusedContent> contentsMap;
-//	HashMap<String,Set<String>> informedAgents;
+	Map<Double, DiffusionDataContainer> diffusionDataMapFromDiffusionModel; //stores data received from the DiffusionModel
+	private DiffusionDataContainer diffusionDataContainerFromBDIModel = new DiffusionDataContainer(); // stores diffusion updates from BDI agents, to be sent to the DiffusionModel
 
 	private int evacPeak = 0;
 	private int[] evacStartHHMM = {0,0};
@@ -93,8 +92,7 @@ public class JillBDIModel extends JillModel implements DataClient {
 
 	public JillBDIModel(String[] initArgs) {
 		super();
-		contentsMap = new HashMap<>();
-//		informedAgents = new HashMap<>();
+		diffusionDataMapFromDiffusionModel = new TreeMap<>();
 		mapMATsimToJillIds = new LinkedHashMap<String,String>();
 		mapJillToMATsimIds = new LinkedHashMap<String,String>();
 		this.initArgs = initArgs;
@@ -328,8 +326,8 @@ public class JillBDIModel extends JillModel implements DataClient {
 	{
 		dataServer.subscribe(this, Constants.TAKE_CONTROL_BDI);
 		dataServer.subscribe(this, Constants.FIRE_ALERT);
-		dataServer.subscribe(this, Constants.DIFFUSION);
-		dataServer.subscribe(this, Constants.SOCIAL_NETWORK_CONTENT);
+		dataServer.subscribe(this, Constants.DIFFUSION_DATA_CONTAINER_FROM_DIFFUSION_MODEL);
+		dataServer.subscribe(this, Constants.DIFFUSION_UPDATES_FROM_BDI_AGENT);
 
 		logger.info("Initialising jill with args: " + Arrays.toString(initArgs));
 		// Initialise the Jill model
@@ -373,8 +371,8 @@ public class JillBDIModel extends JillModel implements DataClient {
 		switch (dataType) {
 			case Constants.TAKE_CONTROL_BDI:
 			case Constants.FIRE_ALERT:
-			case Constants.DIFFUSION:
-			case Constants.SOCIAL_NETWORK_CONTENT:
+			case Constants.DIFFUSION_DATA_CONTAINER_FROM_DIFFUSION_MODEL:
+			case Constants.DIFFUSION_UPDATES_FROM_BDI_AGENT:
 				dataListeners.get(dataType).receiveData(time, dataType, data);
 				break;
 			default:
@@ -387,20 +385,42 @@ public class JillBDIModel extends JillModel implements DataClient {
 		evacPeak = peak;
 	}
 
-	protected void sendSocialNetworkMessagesToAgents(AgentDataContainer adc) {
+	private void handleReceivedUpdatesFromDiffusionModel(AgentDataContainer adc) {
 
-		for (String id : contentsMap.keySet()) {
-			DiffusedContent diffusedContent  = contentsMap.get(id);
-			PerceptContent snPercept = new PerceptContent(Constants.SOCIAL_NETWORK_CONTENT,diffusedContent);
-//			adc.getOrCreate(id).getPerceptContainer().put(Constants.SOCIAL_NETWORK_CONTENT, content);
-			adc.putPercept(id,Constants.SOCIAL_NETWORK_CONTENT,snPercept);
+		if(diffusionDataMapFromDiffusionModel == null || diffusionDataMapFromDiffusionModel.isEmpty()){
+			return;
+		}
+		else if(diffusionDataMapFromDiffusionModel.size() == 1) { // diffusion data for one step
+			DiffusionDataContainer dataContainer = diffusionDataMapFromDiffusionModel.values().iterator().next();
+
+			HashMap<String,DiffusionContent>  diffusionContentsMap = dataContainer.getDiffusionDataMap();
+			for (String id : diffusionContentsMap.keySet()) {
+				DiffusionContent diffusionContent  = diffusionContentsMap.get(id);
+				PerceptContent diffusionPercept = new PerceptContent(Constants.DIFFUSION_CONTENT,diffusionContent);
+				adc.putPercept(id,Constants.DIFFUSION_CONTENT,diffusionPercept);
 
 			}
-		logger.info("Total "+contentsMap.size()+" agents received  influences from social network:");
-		logger.info("Agents receiving influences from social network are: {}",
-				Arrays.toString(contentsMap.keySet().toArray()));
-		contentsMap.clear(); // clear last diffusion step contents
+			logger.info("Total "+ diffusionContentsMap.size()+" agents received  contents from DiffusionModel:");
+			logger.info("Agents receiving contents from DiffusionModel are: {}",
+					Arrays.toString(diffusionContentsMap.keySet().toArray()));
 
+			diffusionDataMapFromDiffusionModel.clear(); // now clear diffusion data
+		}
+		else{
+			logger.warn("Received diffusion data for multiple steps. This is not encouraged as BDI agents need to decide what to do with contents for each diffusion step. Otherwise the diffusion model cannot execute the next step! {}", diffusionDataMapFromDiffusionModel.size());
+
+		}
+
+
+	}
+
+	private  void sendUpdatesToDiffusionModel(){
+
+    	if(diffusionDataContainerFromBDIModel.getDiffusionDataMap().isEmpty()){
+    		return;
+		}
+
+		dataServer.publish(Constants.DIFFUSION_DATA_CONTAINDER_FROM_BDI, diffusionDataContainerFromBDIModel);
 	}
 
 	private void translateToJillIds(AgentDataContainer adc) {
@@ -445,8 +465,6 @@ public class JillBDIModel extends JillModel implements DataClient {
 		}
 	}
 
-
-
 	/**
 	 * Creates a listener for each type of message we expect from the DataServer
 	 * @return
@@ -458,10 +476,10 @@ public class JillBDIModel extends JillModel implements DataClient {
 			//takeControl(data);
 			synchronized (getSequenceLock()) {
 				getAgentDataContainer().clear();
-				if(!contentsMap.isEmpty()){
-					sendSocialNetworkMessagesToAgents(data);
-				}
+				diffusionDataContainerFromBDIModel.getDiffusionDataMap().clear(); // clear previous Diffusion contents from BDI agents
+				handleReceivedUpdatesFromDiffusionModel(data);
 				takeControl(time, data);
+				sendUpdatesToDiffusionModel();
 				dataServer.publish(Constants.AGENT_DATA_CONTAINER_FROM_BDI, getAgentDataContainer());
 			}
 		});
@@ -470,19 +488,22 @@ public class JillBDIModel extends JillModel implements DataClient {
 			fireAlertTime = time;
 		});
 
-		listeners.put(Constants.DIFFUSION, (DataClient<Map<String, DiffusedContent>>) (time, dataType, data) -> {
-			contentsMap = data;
+		listeners.put(Constants.DIFFUSION_DATA_CONTAINER_FROM_DIFFUSION_MODEL, (DataClient<SortedMap<Double, DiffusionDataContainer>>) (time, dataType, data) -> {
+			diffusionDataMapFromDiffusionModel = data;
 		});
 
-		listeners.put(Constants.SOCIAL_NETWORK_CONTENT, (DataClient<String[]>) (time, dataType, data) -> {
-			logger.warn("Ignoring received data of type {}", dataType);
+		listeners.put(Constants.DIFFUSION_UPDATES_FROM_BDI_AGENT, (DataClient<Object[]>) (time, dataType, data) -> {
+			Object[] parameters = data;
+			String agentId = (String) parameters[0];
+			DiffusionContent dataContent = (DiffusionContent)parameters[1];
+			if(!(dataContent instanceof DiffusionContent)) {
+				logger.warn("unknown content received from BDI agent {} : {}", agentId, dataContent.toString());
+			}
+			diffusionDataContainerFromBDIModel.getDiffusionDataMap().put(agentId,dataContent);
 		});
 
 		return listeners;
 	}
-
-
-
 	public void useSequenceLock(Object sequenceLock) {
 		this.sequenceLock = sequenceLock;
 	}
@@ -490,18 +511,5 @@ public class JillBDIModel extends JillModel implements DataClient {
 	protected Object getSequenceLock() {
 		return sequenceLock;
 	}
-
-	public Map<String, DiffusedContent> getContentsMap() {
-		return contentsMap;
-	}
-
-	public void setContentsMap(Map<String, DiffusedContent> contentsMap) {
-		this.contentsMap = contentsMap;
-	}
-
-	public DataServer getDataServer() {
-		return dataServer;
-	}
-
 
 }

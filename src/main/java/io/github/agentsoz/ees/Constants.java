@@ -53,13 +53,14 @@ public class Constants {
     public static final String REQUEST_LOCATION = io.github.agentsoz.util.PerceptList.REQUEST_LOCATION;
     public static final String REQUEST_DRIVING_DISTANCE_TO = io.github.agentsoz.util.PerceptList.REQUEST_DRIVING_DISTANCE_TO;
 
-    //Diffusion model percepts
-    public static final String DIFFUSION = "diffusion";
-    public static final String BDI_REASONING_UPDATES = "bdi_reasoning_updates";
+    //Diffusion model
+    public static final String DIFFUSION_DATA_CONTAINER_FROM_DIFFUSION_MODEL = "diffusion_data_container_from_diffusion_model";
+    public static final String DIFFUSION_DATA_CONTAINDER_FROM_BDI = "diffusion_data_container_from_bdi";
+    public static final String DIFFUSION_UPDATES_FROM_BDI_AGENT = "diffusion_updates_from_bdi_agent";
+    public static final String DIFFUSION_CONTENT = "diffusion_content";
     public static final String EVACUATION_INFLUENCE = "evacuation_influence";
-    public static final String SOCIAL_NETWORK_CONTENT = "social_network_content";
+    public static final String BLOCKAGE_INFLUENCE = "blockage_influence";
     public static final String ACTIVE = "active";
-
 
     // Used to control the simulation run and data passing between BDI and ABM models
     public static final String TAKE_CONTROL_BDI = io.github.agentsoz.util.PerceptList.TAKE_CONTROL_BDI;
