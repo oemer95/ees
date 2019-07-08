@@ -277,13 +277,17 @@ public abstract class BushfireAgent extends  Agent implements io.github.agentsoz
         }
     }
 
-    public  DiffusionContent getOrCreateDiffusionContent() {
+    protected  DiffusionContent getOrCreateDiffusionContent() {
 
         if (this.diffusionContent == null) {
             diffusionContent = new DiffusionContent();
         }
 
         return diffusionContent;
+    }
+
+    protected void setPublishDiffusionContentToTrue(){
+        this.publishDiffusionContent = true;
     }
 
     private void handleSocialPercept(String perceptID, Object parameters) {

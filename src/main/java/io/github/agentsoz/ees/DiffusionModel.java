@@ -134,8 +134,6 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusionDat
                     }
                 }
 
-                    this.allStepsDiffusionData.put(timestep, dataContainer);
-
                 }
 
         }
@@ -179,8 +177,11 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusionDat
 
             }
 
-            // step the models and update data container
+            // step the models
             stepDiffusionProcess(currentStepDataContainer,timestep);
+
+            //now put the current step data container to all steps data map
+            this.allStepsDiffusionData.put(timestep, currentStepDataContainer);
 
             // clear the contents
             globalContentFromAgents.clear();
@@ -326,5 +327,7 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusionDat
     }
 
 
-
+    public TreeMap<Double, DiffusionDataContainer> getAllStepsDiffusionData() {
+        return allStepsDiffusionData;
+    }
 }
