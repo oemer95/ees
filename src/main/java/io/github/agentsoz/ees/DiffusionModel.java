@@ -144,6 +144,8 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusionDat
 
     @Override
     public SortedMap<Double, DiffusionDataContainer> sendData(double timestep, String dataType) {
+
+        double currentTimeInMinutes = Time.convertTime(timestep, timestepUnit, Time.TimestepUnit.MINUTES); // current time in minutes
         Double nextTime = timestep + SNConfig.getDiffturn();
 
         // create data structure to store current step contents and params
@@ -178,10 +180,14 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusionDat
             }
 
             // step the models
-            stepDiffusionProcess(currentStepDataContainer,timestep);
+            stepDiffusionProcess(currentStepDataContainer,currentTimeInMinutes);
 
             //now put the current step data container to all steps data map
-            this.allStepsDiffusionData.put(timestep, currentStepDataContainer);
+           if(currentStepDataContainer.getDiffusionDataMap().isEmpty()){
+               this.allStepsDiffusionData.put(currentTimeInMinutes, currentStepDataContainer);
+           }
+
+
 
             // clear the contents
             globalContentFromAgents.clear();
@@ -189,10 +195,9 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusionDat
 
         }
 
-        double currentTime = Time.convertTime(timestep, timestepUnit, Time.TimestepUnit.MINUTES);
         //+1 to avoid returning empty map for diffusion data for first step (toKey = fromKey)
-        SortedMap<Double, DiffusionDataContainer> periodicDiffusionData =   allStepsDiffusionData.subMap(lastUpdateTimeInMinutes,currentTime+1);
-        lastUpdateTimeInMinutes = currentTime;
+        SortedMap<Double, DiffusionDataContainer> periodicDiffusionData =   allStepsDiffusionData.subMap(lastUpdateTimeInMinutes,currentTimeInMinutes+1);
+        lastUpdateTimeInMinutes = currentTimeInMinutes;
 
         return (currentStepDataContainer.getDiffusionDataMap().isEmpty()) ? null : periodicDiffusionData;
 
@@ -329,5 +334,13 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusionDat
 
     public TreeMap<Double, DiffusionDataContainer> getAllStepsDiffusionData() {
         return allStepsDiffusionData;
+    }
+
+    public Map<String, Set> getLocalContentFromAgents() {
+        return localContentFromAgents;
+    }
+
+    public ArrayList<String> getGlobalContentFromAgents() {
+        return globalContentFromAgents;
     }
 }
