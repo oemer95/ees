@@ -111,24 +111,24 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusionDat
         this.dataServer.subscribe(this, Constants.DIFFUSION_DATA_CONTAINDER_FROM_BDI);
     }
 
-    protected void stepDiffusionProcess(DiffusionDataContainer dataContainer, double timestep) {
+    protected void stepDiffusionProcess(DiffusionDataContainer dataContainer, String contentType, double timestep) {
         snManager.diffuseContent(); // step the diffusion model
 
         if (snManager.getDiffModel() instanceof ICModel) {
             ICModel icModel = (ICModel) snManager.getDiffModel();
-            icModel.recordCurrentStepSpread(timestep);
+            icModel.recordCurrentStepSpread((int)timestep);
 
             HashMap<String, ArrayList<String>> latestUpdate = icModel.getLatestDiffusionUpdates();
             if (!latestUpdate.isEmpty()) {
 
                 for(Map.Entry<String,ArrayList<String>> contents: latestUpdate.entrySet()) {
-                    String contentType = contents.getKey();
+                    String content = contents.getKey();
                     ArrayList<String> agentIDs = contents.getValue();
-                    logger.info("{} agents activated at time {} for content {}", agentIDs.toString(),timestep,contentType);
+                    logger.info("agents activated for content {} at time {} are: {}",content,(int)timestep,agentIDs.toString());
 
                     for(String id: agentIDs) { // for each agent create a DiffusionContent and put content type and parameters
                      //   DiffusionContent content = dataContainer.getOrCreateDiffusedContent(id);
-                        String[] params = {Constants.ACTIVE};
+                        String[] params = {content};
                         dataContainer.putContentToContentsMapFromDiffusionModel(id,contentType, params);
                       //  content.getContentsMapFromDiffusionModel().put(contentType,params );
                     }
@@ -180,7 +180,7 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusionDat
             }
 
             // step the models
-            stepDiffusionProcess(currentStepDataContainer,currentTimeInMinutes);
+            stepDiffusionProcess(currentStepDataContainer,Constants.EVACUATION_INFLUENCE,currentTimeInMinutes);
 
             //now put the current step data container to all steps data map
            if(currentStepDataContainer.getDiffusionDataMap().isEmpty()){
@@ -226,14 +226,14 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusionDat
                         if(!dc.getContentsMapFromBDIModel().isEmpty()){
                             for(String localContent: dc.getContentsMapFromBDIModel().keySet()){
                                 String[] contents = (String[]) dc.getContentsMapFromBDIModel().get(localContent);
-                                String msg = contents[0];
+                                String content = contents[0];
                                 // do something with parameters
 
-                                logger.debug("Agent {} received local content type {}. Message: {}",agentId,localContent, msg);
-                                Set<String> agents = (localContentFromAgents.containsKey(localContent)) ? localContentFromAgents.get(localContent) :
+                                logger.debug("Agent {} received content {} of type {} ",agentId,content,localContent);
+                                Set<String> agents = (localContentFromAgents.containsKey(content)) ? localContentFromAgents.get(content) :
                                         new HashSet<>();
                                 agents.add(agentId);
-                                localContentFromAgents.put(localContent, agents);
+                                localContentFromAgents.put(content, agents);
                             }
                         }
 
