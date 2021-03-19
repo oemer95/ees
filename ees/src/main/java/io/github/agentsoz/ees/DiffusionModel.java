@@ -116,7 +116,7 @@ public class DiffusionModel implements DataSource<SortedMap<Double, DiffusionDat
 
         if (snManager.getDiffModels()[0] instanceof ICModel) {
             ICModel icModel = (ICModel) snManager.getDiffModels()[0];
-            icModel.recordCurrentStepSpread((int)timestep);
+//            icModel.recordCurrentStepSpread((int)timestep); // this is done in SNManager
 
             HashMap<String, ArrayList<String>> latestUpdate = icModel.getLatestDiffusionUpdates();
             if (!latestUpdate.isEmpty()) {

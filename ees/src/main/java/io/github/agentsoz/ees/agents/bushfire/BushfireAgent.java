@@ -489,7 +489,7 @@ public abstract class BushfireAgent extends  Agent implements io.github.agentsoz
         return true;
     }
 
-    protected boolean replanCurrentDriveTo(Constants.EvacRoutingMode routingMode) {
+    public boolean replanCurrentDriveTo(Constants.EvacRoutingMode routingMode) {
         memorise(MemoryEventType.ACTIONED.name(), Constants.REPLAN_CURRENT_DRIVETO);
         EnvironmentAction action = new EnvironmentAction(
                 Integer.toString(getId()),
