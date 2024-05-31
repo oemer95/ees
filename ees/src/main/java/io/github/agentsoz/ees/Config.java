@@ -4,7 +4,7 @@ package io.github.agentsoz.ees;
  * #%L
  * Emergency Evacuation Simulator
  * %%
- * Copyright (C) 2014 - 2021 by its authors. See AUTHORS file.
+ * Copyright (C) 2014 - 2022 by its authors. See AUTHORS file.
  * %%
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -70,7 +70,10 @@ public class Config {
 	static final String eGlobalMetricsOutFile = "metricsOutFile";
 	static final String eGlobalMetricsBinSizeInSecs = "metricsBinSizeInSecs";
 	// Model IDs in XML
+	static final String eModelCyclone = "cyclone";
+	static final String eModelFlood = "flood";
 	static final String eModelFire = "phoenix";
+	static final String eModelFireSpark = "spark";
 	static final String eModelDisruption = "disruption";
 	static final String eModelMessaging = "messaging";
 	static final String eModelMatsim = "matsim";

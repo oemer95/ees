@@ -4,7 +4,7 @@ package io.github.agentsoz.ees;
  * #%L
  * Emergency Evacuation Simulator
  * %%
- * Copyright (C) 2014 - 2021 by its authors. See AUTHORS file.
+ * Copyright (C) 2014 - 2022 by its authors. See AUTHORS file.
  * %%
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -55,7 +55,7 @@ public class Run implements DataClient {
     private DiffusionModel diffusionModel = null;
 
     //  Defaults
-    private int optTimestep = 1; // in seconds
+    private int optTimestep = 10; // in seconds
 
 
     public static void main(String[] args) {
@@ -103,6 +103,25 @@ public class Run implements DataClient {
         {
             log.info("Starting phoenix fire model (GRID)");
             PhoenixGridModel model = new PhoenixGridModel(cfg.getModelConfig(Config.eModelFire), dataServer);
+            model.setTimestepUnit(Time.TimestepUnit.SECONDS);
+            model.start();
+        }
+        // initialise the cyclone model and register it as an active data source
+        {
+            log.info("Starting cyclone model ");
+            CycloneModel model = new CycloneModel(cfg.getModelConfig(Config.eModelCyclone), dataServer);
+            model.setTimestepUnit(Time.TimestepUnit.SECONDS);
+            model.start();
+        }
+        {
+            log.info("Starting flood model ");
+            FloodModel model = new FloodModel(cfg.getModelConfig(Config.eModelFlood), dataServer);
+            model.setTimestepUnit(Time.TimestepUnit.SECONDS);
+            model.start();
+        }
+        {
+            log.info("Starting Spark fire model");
+            SparkFireModel model = new SparkFireModel(cfg.getModelConfig(Config.eModelFireSpark), dataServer);
             model.setTimestepUnit(Time.TimestepUnit.SECONDS);
             model.start();
         }

@@ -4,7 +4,7 @@ package io.github.agentsoz.ees;
  * #%L
  * Emergency Evacuation Simulator
  * %%
- * Copyright (C) 2014 - 2021 by its authors. See AUTHORS file.
+ * Copyright (C) 2014 - 2022 by its authors. See AUTHORS file.
  * %%
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -106,6 +106,13 @@ public class DisruptionModel implements DataSource<SortedMap<Double, Disruption>
 			Calendar cal = Calendar.getInstance();
 			cal.setTime(date);
 			double minutes = 60 * cal.get(Calendar.HOUR_OF_DAY) + cal.get(Calendar.MINUTE);
+			if (disruptions.containsKey(minutes)) {
+				throw new RuntimeException("\n\nCONFIGURATION ERROR:" +
+						"\nFound multiple disruption blocks in " + file + " for time " + disruption.getStartHHMM() +
+						".\nDisruption model does not support multiple disruption blocks " +
+						"for the same time step. " +
+						"\nPlease either combine the blocks or change the time for one of them.\n\n");
+			}
 			disruptions.put(minutes, disruption);
 		}
 	}
