@@ -17,8 +17,8 @@ Copyright (C) 2014-2019 by
   - Contributions: Jadex Agents, Contract Net Protocol, Messages
 - [Ömer Erduran](https://github.com/oemer95)
    - Contributions: Documentation of Contributions, MATSim Time Update / Communication with Jadex using "bdi-abm"
-- [Mahkam Raupov]
+- Mahkam Raupov
   - Contributions: Jadex Area Agent capabilities, Parser classes, Messages
-- [Thu Pham Dieu Anh]
+- Thu Pham Dieu Anh
   - Contributions: Implemented the Jadex Model and connected it with MATSim
   
