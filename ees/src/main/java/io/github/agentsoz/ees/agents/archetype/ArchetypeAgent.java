@@ -4,7 +4,7 @@ package io.github.agentsoz.ees.agents.archetype;
  * #%L
  * Emergency Evacuation Simulator
  * %%
- * Copyright (C) 2014 - 2021 by its authors. See AUTHORS file.
+ * Copyright (C) 2014 - 2022 by its authors. See AUTHORS file.
  * %%
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -74,6 +74,7 @@ public class ArchetypeAgent extends Agent implements io.github.agentsoz.bdiabm.A
         responseThresholdFinalReached,
         //
         status,
+        receivedMessages,
         isStuck,
     }
 
@@ -118,6 +119,7 @@ public class ArchetypeAgent extends Agent implements io.github.agentsoz.bdiabm.A
         WillGoHomeAfterVisitingDependents("WillGoHomeAfterVisitingDependents"),
         WillGoHomeBeforeLeaving("WillGoHomeBeforeLeaving"),
         WillStay("WillStay"),
+        WillReceiveMessages("WillReceiveMessages")
         ;
 
         private final String commonName;
@@ -311,6 +313,14 @@ public class ArchetypeAgent extends Agent implements io.github.agentsoz.bdiabm.A
         return status;
     }
 
+    public String getReceivedMessages() {
+        String val = getBelief(State.receivedMessages.name());
+        if (val == null) {
+            val = "na";
+        }
+        return val;
+    }
+
     //===============================================================================
     //endregion
     //===============================================================================
@@ -378,10 +388,13 @@ public class ArchetypeAgent extends Agent implements io.github.agentsoz.bdiabm.A
         if (Constants.SIGHTED_EMBERS.equalsIgnoreCase(view.toString())) {
             anxietyFromSituation += futureValueOfVisibleEmbers;
             futureValueOfVisibleEmbers = 0.0;
-
+            record("believes anxietyFromSituation=" + anxietyFromSituation);
+            record("believes futureValueOfVisibleEmbers=" + futureValueOfVisibleEmbers);
         } else if (Constants.SIGHTED_FIRE.equalsIgnoreCase(view.toString())) {
             anxietyFromSituation += futureValueOfVisibleFire;
             futureValueOfVisibleFire = 0.0;
+            record("believes anxietyFromSituation=" + anxietyFromSituation);
+            record("believes futureValueOfVisibleFire=" + futureValueOfVisibleFire);
         } else {
             logger.error("{} ignoring field of view percept: {}", logPrefix(), view);
             return;
@@ -390,28 +403,41 @@ public class ArchetypeAgent extends Agent implements io.github.agentsoz.bdiabm.A
 
     private void handleEmergencyMessage(Object parameters) {
         try{
+            boolean willReceiveMessages = Boolean.valueOf(getBelief(Beliefname.WillReceiveMessages.name()));
+            if(!willReceiveMessages) {
+                record("did not get message " + parameters);
+                believe(State.receivedMessages.name(), Boolean.toString(false));
+                return;
+            }
             record("got message " + parameters);
+            believe(State.receivedMessages.name(), Boolean.toString(true));
+
             double effect = 0.0;
             String[] args = ((String)parameters).split(",");
             if (Advice.getCommonName().equals(args[0])) {
                 effect = futureValueOfMessageAdvice;
                 futureValueOfMessageAdvice = 0.0;
+                record("believes futureValueOfMessageAdvice=" + futureValueOfMessageAdvice);
             } else if (WatchAndAct.getCommonName().equals(args[0])) {
                 effect = futureValueOfMessageWatchAndAct;
                 futureValueOfMessageWatchAndAct = 0.0;
+                record("believes futureValueOfMessageWatchAndAct=" + futureValueOfMessageWatchAndAct);
             } else if (EmergencyWarning.getCommonName().equals(args[0])) {
                 effect = futureValueOfMessageEmergencyWarning;
                 futureValueOfMessageEmergencyWarning = 0.0;
+                record("believes futureValueOfMessageEmergencyWarning=" + futureValueOfMessageEmergencyWarning);
             } else if (EvacuateNow.getCommonName().equals(args[0])) {
                 effect = futureValueOfMessageEvacuateNow;
                 futureValueOfMessageEvacuateNow = 0.0;
+                record("believes futureValueOfMessageEvacuateNow=" + futureValueOfMessageEvacuateNow);
                 if (args.length >= 4) { // we have three more args being name,x,y
                     String loc = args[1] + "," + args[2] + "," + args[3];
                     evacLocation = parseLocation(loc);
                 }
             }
             anxietyFromEmergencyMessages += effect;
-        } catch (Exception e) {
+            record("believes anxietyFromEmergencyMessages=" + anxietyFromEmergencyMessages);
+       } catch (Exception e) {
             logger.warn(logPrefix() + "failed to parse " + parameters);
         }
     }
@@ -422,10 +448,15 @@ public class ArchetypeAgent extends Agent implements io.github.agentsoz.bdiabm.A
     private void handleStuck(Object parameters) {
         believe(State.isStuck.name(), Boolean.toString(true));
         believe(State.status.name(), ArchetypeAgent.StatusValue.at.name() + ":" + Constants.EvacActivity.StuckPlace.name());
-        Object[] args = (Object[])parameters;
         stuckLocation = new Location[2];
-        stuckLocation[0] = new Location((String)args[0], (double)args[1], (double)args[2]);
-        stuckLocation[1] = new Location((String)args[3], (double)args[4], (double)args[5]);
+        if(parameters != null) {
+            Object[] args = (Object[]) parameters;
+            stuckLocation[0] = new Location((String) args[0], (double) args[1], (double) args[2]);
+            stuckLocation[1] = new Location((String) args[3], (double) args[4], (double) args[5]);
+        } else {
+            stuckLocation[0] = new Location("unknown:unknown", -1, -1);
+            stuckLocation[1] = new Location("unknown:unknown", -1, -1);
+        }
     }
 
     void handleAgentNotFoundException(String errorMessage) {
@@ -598,7 +629,10 @@ public class ArchetypeAgent extends Agent implements io.github.agentsoz.bdiabm.A
         //
         believe(State.responseThresholdInitialReached.name(), null);
         believe(State.responseThresholdFinalReached.name(), null);
-
+        //
+        b = getBelief(Beliefname.WillReceiveMessages.name());
+        believe(Beliefname.WillReceiveMessages.name(), b == null ? "true" : b);
+        believe(State.receivedMessages.name(), null);
     }
 
     //===============================================================================
@@ -778,6 +812,34 @@ public class ArchetypeAgent extends Agent implements io.github.agentsoz.bdiabm.A
             String value = getBelief(beliefname.toString());
             record("believes " + beliefname.name() + "=" + value + " #" + beliefname.getCommonName());
         }
+        String beliefname = Beliefname.ResponseThresholdInitial.getCommonName();
+        record("believes " + beliefname + "=" + responseThresholdInitial + " #" + beliefname);
+        beliefname = Beliefname.ResponseThresholdFinal.getCommonName();
+        record("believes " + beliefname + "=" + responseThresholdFinal + " #" + beliefname);
+        beliefname = Beliefname.HasDependentsAtLocation.getCommonName();
+        record("believes " + beliefname + "=" + dependentsLocation + " #" + beliefname);
+        beliefname = Beliefname.LocationEvacuationPreference.getCommonName();
+        record("believes " + beliefname + "=" + evacLocation + " #" + beliefname);
+        beliefname = Beliefname.LocationInvacPreference.getCommonName();
+        record("believes " + beliefname + "=" + invacLocation + " #" + beliefname);
+        beliefname = Beliefname.LocationHome.getCommonName();
+        record("believes " + beliefname + "=" + homeLocation + " #" + beliefname);
+        beliefname = Beliefname.LocationWork.getCommonName();
+        record("believes " + beliefname + "=" + workLocation + " #" + beliefname);
+
+        record("believes futureValueOfFireDangerIndexRating=" + futureValueOfFireDangerIndexRating);
+        record("believes futureValueOfSmokeImmersion=" + futureValueOfSmokeImmersion);
+        record("believes futureValueOfMessageAdvice=" + futureValueOfMessageAdvice);
+        record("believes futureValueOfMessageEmergencyWarning=" + futureValueOfMessageEmergencyWarning);
+        record("believes futureValueOfMessageEvacuateNow=" + futureValueOfMessageEvacuateNow);
+        record("believes futureValueOfMessageRespondersAttending=" + futureValueOfMessageRespondersAttending);
+        record("believes futureValueOfMessageWatchAndAct=" + futureValueOfMessageWatchAndAct);
+        record("believes futureValueOfMessageSocial=" + futureValueOfMessageSocial);
+        record("believes futureValueOfVisibleEmbers=" + futureValueOfVisibleEmbers);
+        record("believes futureValueOfVisibleFire=" + futureValueOfVisibleFire);
+        record("believes futureValueOfVisibleResponders=" + futureValueOfVisibleResponders);
+        record("believes futureValueOfVisibleSmoke=" + futureValueOfVisibleSmoke);
+        record("believes anxietyFromSituation=" + anxietyFromSituation);
 
         // Initialise behaviour attributes from initial beliefs
         initialiseBeliefs();

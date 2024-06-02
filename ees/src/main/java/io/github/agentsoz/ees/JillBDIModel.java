@@ -4,7 +4,7 @@ package io.github.agentsoz.ees;
  * #%L
  * Emergency Evacuation Simulator
  * %%
- * Copyright (C) 2014 - 2021 by its authors. See AUTHORS file.
+ * Copyright (C) 2014 - 2022 by its authors. See AUTHORS file.
  * %%
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -531,7 +531,8 @@ public class JillBDIModel extends JillModel implements DataClient {
 					Location[] fromTo = agent.getCurrentLocation();
 					String linkId = fromTo[0].getName().split(":")[0];
 					String status = agent.getCurrentStatus();
-					agentsMetrics.put(id, new AgentMetricData(id, type, status, linkId, fromTo[0], fromTo[1]));
+					String receivedMessages = agent.getReceivedMessages();
+					agentsMetrics.put(id, new AgentMetricData(id, type, status, linkId, fromTo[0], fromTo[1], receivedMessages));
 
 					String statusType = status.split(":")[0];
 					LinkMetricData linkMetricData = linksMetrics.containsKey(linkId) ?
@@ -599,19 +600,28 @@ public class JillBDIModel extends JillModel implements DataClient {
 
 	class AgentMetricData {
 		final private int agentId;
-		final private String agentType;
+		//final private String agentType;
 		final private String linkId;
-		final private Location nodeFrom;
-		final private Location nodeTo;
+		//final private Location nodeFrom;
+		//final private Location nodeTo;
 		final private String status;
+		final private String messagesReceived;
 
-		public AgentMetricData(int agentId, String type, String status, String linkId, Location nodeFrom, Location nodeTo) {
+		public AgentMetricData(int agentId,
+							   String type,
+							   String status,
+							   String linkId,
+							   Location nodeFrom,
+							   Location nodeTo,
+							   String messagesReceived) {
 			this.agentId = agentId;
-			this.agentType = type;
+			//this.agentType = type; // TODO: disabled for SCS exercise on 14.Dec.21
 			this.status = status;
 			this.linkId = linkId;
-			this.nodeFrom = nodeFrom;
-			this.nodeTo = nodeTo;
+			//this.nodeFrom = nodeFrom; // TODO: disabled for SCS exercise on 14.Dec.21
+			//this.nodeTo = nodeTo; // TODO: disabled for SCS exercise on 14.Dec.21
+			this.messagesReceived = messagesReceived;
+
 		}
 	}
 

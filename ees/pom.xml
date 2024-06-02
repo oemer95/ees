@@ -128,7 +128,7 @@
     <dependency>
       <groupId>com.google.code.gson</groupId>
       <artifactId>gson</artifactId>
-      <version>2.8.2</version>
+      <version>2.8.9</version>
     </dependency>
     <!-- JUnit for unit testing -->
     <dependency>
@@ -147,6 +147,22 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-csv</artifactId>
       <version>1.6</version>
+    </dependency>
+    <!-- for easy EPSG transforms -->
+    <dependency>
+      <groupId>org.geotools</groupId>
+      <artifactId>gt-api</artifactId>
+      <version>20.5</version>
+    </dependency>
+    <dependency>
+      <groupId>org.geotools</groupId>
+      <artifactId>gt-epsg-hsql</artifactId>
+      <version>20.5</version>
+    </dependency>
+    <dependency>
+      <groupId>org.activecomponents.jadex</groupId>
+      <artifactId>jadex-distribution-standard</artifactId>
+      <version>4.0.267</version>
     </dependency>
   </dependencies>
 
@@ -308,7 +324,7 @@
           <forkCount>1</forkCount>
           <reuseForks>false</reuseForks>
           <!-- avoid out of memory errors: -->
-          <argLine>-Xmx4000m -Djava.awt.headless=true -Dmatsim.preferLocalDtds=true </argLine>
+          <argLine>-Xmx8g -Xms8g -Djava.awt.headless=true -Dmatsim.preferLocalDtds=true</argLine>
         </configuration>
       </plugin>
       <plugin>
