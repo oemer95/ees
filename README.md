@@ -1,12 +1,21 @@
 # EES-Jadex Layer Installation 
 
+In the following, the Installation for EES-Jadex is described, the Jadex integration layer that connects Jadex Agents with MATSim.
+ 
+ 1. Download this repository and process the Setup and Build package as described below. Also note that one submodule is pointed to another forked repository (bdi-abm-Integration [BDI-ABM Integration](https://github.com/oemer/bdi-abm-integration).
 
-In the following, we will describe the Installation steps for EES-Jadex.
- 1. Download the repository and process the Setup and Build package. 
- 2. Import the AMOD Scenario provided in the folder "amod-campus" in the following path: 
- 3. Create a run config with the following specifications:
- 4. Update the paths in the following classes:
- 5. 
+ 2. Import the AMOD Scenario provided in the folder "amod-campus" in the following path:
+ 
+ 3. Update the path(s) in the following class(es):
+    - XmlJavaParse.java: In Line 23 a path to the Jadex Config XML-File "TrikeWorld.application.xml" is needed
+
+ 4. Create a run config with the following specifications: Java 11+, -cp eeslib, io.github.agentsoz.ees.jadexextension.masterthesis.Run.Run;
+    program argument: --config ees/scenarios/matsim-drt-frankfurt-campus-westend-example/ees_ffm.xml 
+
+
+
+
+ 
 
 
 # Emergency Evacuation Simulator
