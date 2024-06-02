@@ -2,7 +2,7 @@
 
 In the following, the Installation for EES-Jadex is described, the Jadex integration layer that connects Jadex Agents with MATSim.
  
- 1. Download/Clone this repository and process the Setup and Build package as described below. Also, note that one of the submodules is pointed to another forked repository [BDI-ABM Integration](https://github.com/oemer/bdi-abm-integration).
+ 1. Download/Clone this repository and process the Setup and Build package as described below. Also, note that one of the submodules is pointed to another forked repository [BDI-ABM Integration](https://github.com/oemer95/bdi-abm-integration).
 
  2. Import the AMOD Scenario provided in the folder "amod-campus" in the following path:
  
