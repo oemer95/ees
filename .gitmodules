@@ -9,4 +9,4 @@
 [submodule "libs/bdi-abm-integration"]
 	path = libs/bdi-abm-integration
 	url = ../bdi-abm-integration.git
-	branch = master
+	branch = emas24
