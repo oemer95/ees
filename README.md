@@ -8,6 +8,7 @@ In the following, the Installation for EES-Jadex is described, the Jadex integra
  
  3. Update the path(s) in the following class(es):
     - XmlJavaParse.java: In Line 23 the full path to the Jadex Config XML-File "TrikeWorld.application.xml" is needed
+    - Config.java: In Line 82 the full path to the Jadex Config XML-File "TrikeWorld.application.xml" is needed
 
  4. Create a run config with the following specifications: Java 11+, -cp eeslib, io.github.agentsoz.ees.jadexextension.masterthesis.Run.Run;
     program argument: --config ees/scenarios/matsim-drt-frankfurt-campus-westend-example/ees_ffm.xml 
