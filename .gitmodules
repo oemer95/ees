@@ -5,7 +5,7 @@
 [submodule "libs/jill"]
 	path = libs/jill
 	url = ../jill.git
-	branch = dev
+	branch = main
 [submodule "libs/bdi-abm-integration"]
 	path = libs/bdi-abm-integration
 	url = ../bdi-abm-integration.git
